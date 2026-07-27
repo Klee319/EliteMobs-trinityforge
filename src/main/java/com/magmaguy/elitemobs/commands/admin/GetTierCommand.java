@@ -5,11 +5,6 @@ import com.magmaguy.elitemobs.config.CommandMessagesConfig;
 import com.magmaguy.elitemobs.items.EliteItemLore;
 import com.magmaguy.elitemobs.items.ItemTagger;
 import com.magmaguy.elitemobs.items.itemconstructor.EliteItemSkins;
-import com.magmaguy.elitemobs.playerdata.database.PlayerData;
-import com.magmaguy.elitemobs.skills.ArmorSkillHealthBonus;
-import com.magmaguy.elitemobs.skills.CombatLevelDisplay;
-import com.magmaguy.elitemobs.skills.SkillType;
-import com.magmaguy.elitemobs.skills.SkillXPCalculator;
 import com.magmaguy.magmacore.util.Logger;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -135,17 +130,9 @@ public class GetTierCommand {
         if (!limited) player.getInventory().addItem(new ItemStack(Material.COOKED_BEEF, 64));
         if (!limited) player.getInventory().addItem(new ItemStack(Material.ARROW, 64));
 
-        // Also set all skill levels to match the tier level
-        long targetXP = SkillXPCalculator.totalXPForLevel(tierLevel);
-        for (SkillType skillType : SkillType.values()) {
-            PlayerData.setSkillXP(player.getUniqueId(), skillType, targetXP);
-        }
-
-        // Update combat level display
-        CombatLevelDisplay.updateDisplay(player);
-
-        // Update armor health bonus (since armor skill was changed)
-        ArmorSkillHealthBonus.updateHealthBonus(player);
+        // NOTE: 旧実装はここで全 SkillType の XP を tier に合わせて setSkillXP していたが、武器スキルは
+        // TrinityForge/ValhallaMMO へ一本化され setSkillXP は no-op（getSkillXP も常時0）。ギア付与という本来の
+        // 機能とは無関係な死にコードだったため撤去した（見かけのスキル設定＝phantom success を残さない）。
 
         Logger.sendMessage(player, CommandMessagesConfig.getGetTierGaveGearMessage().replace("$level", String.valueOf(tierLevel)));
         Logger.sendMessage(player, CommandMessagesConfig.getGetTierIronSwordMessage());

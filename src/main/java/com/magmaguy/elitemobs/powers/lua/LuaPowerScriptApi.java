@@ -289,8 +289,20 @@ final class LuaPowerScriptApi {
         for (LivingEntity target : targets) {
             if (target instanceof Player) {
                 PlayerDamagedByEliteMobEvent.PlayerDamagedByEliteMobEventFilter.setSpecialMultiplier(multiplier);
-            }
-            if (eliteEntity.getLivingEntity() != null) {
+                // Lua ability damage = elite ability damage: same marking as ScriptAction.runDamage so
+                // the TrinityForge combat listener routes it through the MAGICAL component instead of
+                // treating the synthetic damage call as a melee hit.
+                com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.mark();
+                try {
+                    if (eliteEntity.getLivingEntity() != null) {
+                        target.damage(amount, eliteEntity.getLivingEntity());
+                    } else {
+                        target.damage(amount);
+                    }
+                } finally {
+                    com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.clear();
+                }
+            } else if (eliteEntity.getLivingEntity() != null) {
                 target.damage(amount, eliteEntity.getLivingEntity());
             } else {
                 target.damage(amount);

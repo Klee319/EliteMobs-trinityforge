@@ -13,10 +13,12 @@ import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerBedEnterEvent;
 import org.bukkit.event.player.PlayerBedLeaveEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.Map;
@@ -45,6 +47,9 @@ public class CombatLevelDisplay implements Listener {
         if (!SkillsConfig.isSkillSystemEnabled()) return;
         if (!SkillsConfig.isShowCombatLevelDisplay()) return;
         if (NMSManager.getAdapter() == null) return;
+        // Never mount on a dead player: the mount silently breaks and the packet
+        // entity is left floating at the death location.
+        if (player.isDead()) return;
 
         // Remove existing display if present
         removeDisplay(player);
@@ -165,6 +170,31 @@ public class CombatLevelDisplay implements Listener {
         // Remove the quitting player's display
         removeDisplay(event.getPlayer());
         // The global tracker handles hiding other displays from the quitting player
+    }
+
+    /**
+     * On death the server dismounts everything from the dying player, so the packet-only
+     * display would be left floating at the death site. Remove it immediately and let
+     * {@link #onPlayerRespawn(PlayerRespawnEvent)} recreate it.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        removeDisplay(event.getEntity());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerRespawn(PlayerRespawnEvent event) {
+        if (!SkillsConfig.isSkillSystemEnabled()) return;
+        if (!SkillsConfig.isShowCombatLevelDisplay()) return;
+
+        Player player = event.getPlayer();
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (!player.isOnline()) return;
+                createDisplay(player);
+            }
+        }.runTaskLater(MetadataHandler.PLUGIN, 5L);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

@@ -61,8 +61,6 @@ import com.magmaguy.elitemobs.quests.objectives.KillObjective;
 import com.magmaguy.elitemobs.quests.playercooldowns.PlayerQuestCooldownsLogout;
 import com.magmaguy.elitemobs.skills.CombatLevelDisplay;
 import com.magmaguy.elitemobs.skills.SkillSystemMigration;
-import com.magmaguy.elitemobs.skills.SkillXPBar;
-import com.magmaguy.elitemobs.skills.SkillXPHandler;
 import com.magmaguy.elitemobs.skills.bonuses.SkillBonusEventHandler;
 import com.magmaguy.elitemobs.thirdparty.custommodels.CustomModel;
 import com.magmaguy.elitemobs.thirdparty.worldguard.WorldGuardDungeonFlag;
@@ -100,8 +98,10 @@ public class EventsRegistrer {
         register(new PlayerData.PlayerDataEvents());
         register(new ElitePlayerInventory.ElitePlayerInventoryEvents());
         register(new PlayerStatsTracker());
-        register(new SkillXPHandler());
-        register(new SkillXPBar());
+        // Phase 6(2026-07-18): 武器スキルレベリングは無力化。進行はTF/ValhallaMMOに一本化。
+        // procスキルコードは残置(レベル0で実質不発)。XP付与ハンドラとXPバーUIの登録を停止。
+        // register(new SkillXPHandler());
+        // register(new SkillXPBar());
         register(new SkillSystemMigration.MigrationEvents());
         register(new CombatLevelDisplay());
         register(new SkillBonusEventHandler());
@@ -157,6 +157,24 @@ public class EventsRegistrer {
         register(new PlayerTeleportEvent.PlayerTeleportEventExecutor());
         register(new EliteMobDamagedByPlayerEvent.EliteMobDamagedByPlayerEventFilter());
         register(new EliteExplosionEvent.EliteExplosionEvents());
+
+        /*
+        TrinityForge fork listeners (combat delegation, spawn defense-profile stamping, dungeon entry gating and
+        hate-based targeting). They self-disable when TrinityForge is absent or the matching toggle in
+        trinityforge.yml is off, so registering them unconditionally is safe.
+        Note: loot-stat stamping (TrinityForgeLootListener) is no longer an event listener — it is called
+        directly from LootTables at the actual elite-loot distribution points, since EliteMobDeathEvent#getDrops()
+        does not see the real drops (see that class's javadoc).
+         */
+        register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeCombatListener());
+        register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeSpawnListener());
+        register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener());
+        register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeTargetingListener());
+        register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeRepairListener());
+        // MOB-08: re-runs TrinityForgeIntegration.initialize() whenever TrinityForge itself (re)enables,
+        // so a TrinityForge-only plugin-manager reload doesn't leave dungeon-only EXP silently broken
+        // until EliteMobs also restarts (see TrinityForgeReloadListener javadoc).
+        register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeReloadListener());
 
         /*
         While these powers could be registered in a more automated way, I realized that it's also a bad way of getting

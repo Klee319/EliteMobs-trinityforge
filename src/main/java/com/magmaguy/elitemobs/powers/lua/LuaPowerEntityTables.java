@@ -315,7 +315,18 @@ final class LuaPowerEntityTables {
         }));
         entity.set("deal_damage_from_boss", method(entity, args -> {
             if (eliteEntity.getLivingEntity() != null) {
-                livingEntity.damage(args.checkdouble(1), eliteEntity.getLivingEntity());
+                if (livingEntity instanceof org.bukkit.entity.Player) {
+                    // Lua ability damage against a player: mark so the TrinityForge combat listener
+                    // routes it through the MAGICAL component instead of treating it as a melee hit.
+                    com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.mark();
+                    try {
+                        livingEntity.damage(args.checkdouble(1), eliteEntity.getLivingEntity());
+                    } finally {
+                        com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.clear();
+                    }
+                } else {
+                    livingEntity.damage(args.checkdouble(1), eliteEntity.getLivingEntity());
+                }
             }
             return LuaValue.NIL;
         }));

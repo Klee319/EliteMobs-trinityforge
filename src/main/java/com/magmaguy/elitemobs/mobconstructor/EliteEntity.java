@@ -380,6 +380,13 @@ public class EliteEntity {
         // This replaces the old damage modifier system for a better player experience
         double calculatedHealth = com.magmaguy.elitemobs.combatsystem.LevelScaling.calculateMobHealth(level, this.defaultMaxHealth);
         calculatedHealth = NaturalEliteCombatTweak.getTweakedMobHealth(this, level, calculatedHealth);
+        // TrinityForge HP delegation (敵HPをTF化): when a TF profile configures this mob's max-health,
+        // use it as the baseline instead of EliteMobs' exponential level scaling. Applied here (not in a
+        // spawn listener) so every HP write — initial spawn, full-heal, phase-boss reset — stays on the
+        // same TF value. healthMultiplier is still applied on top so EliteMobs per-instance HP variants
+        // (minibosses, reinforcement scaling) keep their relative scaling. 0 = not delegated (unchanged).
+        double tfMaxHealth = com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.resolveProfileMaxHealth(this);
+        if (tfMaxHealth > 0) calculatedHealth = tfMaxHealth;
         this.maxHealth = calculatedHealth * healthMultiplier;
         if (livingEntity != null) AttributeManager.setAttribute(livingEntity, "generic_max_health", maxHealth);
         if (health == null) {
@@ -394,7 +401,12 @@ public class EliteEntity {
     public void setNormalizedMaxHealth() {
         this.defaultMaxHealth = MobCombatSettingsConfig.getNormalizedBaselineHealth();
         // Use exponential HP scaling for normalized combat too
-        this.maxHealth = com.magmaguy.elitemobs.combatsystem.LevelScaling.calculateMobHealth(level, this.defaultMaxHealth) * healthMultiplier;
+        double normalizedHealth = com.magmaguy.elitemobs.combatsystem.LevelScaling.calculateMobHealth(level, this.defaultMaxHealth);
+        // TrinityForge HP delegation (see setMaxHealth): a configured TF profile max-health overrides the
+        // exponential baseline here as well, so normalized combat and phase resets agree with spawn HP.
+        double tfNormalizedHealth = com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.resolveProfileMaxHealth(this);
+        if (tfNormalizedHealth > 0) normalizedHealth = tfNormalizedHealth;
+        this.maxHealth = normalizedHealth * healthMultiplier;
         if (livingEntity != null) {
             AttributeManager.setAttribute(livingEntity, "generic_max_health", maxHealth);
             livingEntity.setHealth(maxHealth);
@@ -611,7 +623,13 @@ public class EliteEntity {
                 MobLevelPlaceholderFormatter.replaceLevelPlaceholders(
                         eliteMobProperties.getName(), this, level));
         livingEntity.setCustomName(this.name);
-        livingEntity.setCustomNameVisible(DefaultConfig.isAlwaysShowNametags());
+        // TrinityForge integration (fork spec item 3): when TrinityForge's own FocusHp display is
+        // showing name/level, hide EliteMobs' vanilla nametag too so the two don't duplicate. The name
+        // string itself is left set (only visibility is affected) — see
+        // TrinityForgeIntegration#isSuppressNativeCombatDisplayEnabled.
+        livingEntity.setCustomNameVisible(
+                !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled()
+                        && DefaultConfig.isAlwaysShowNametags());
     }
 
     public void setName(String name, boolean applyToLivingEntity) {

@@ -243,6 +243,9 @@ public class BossHealthDisplay implements Listener {
      * @param xpAmount The amount of XP gained
      */
     public static void createXPPopup(Location location, Player player, long xpAmount) {
+        // TrinityForge integration (fork spec item 3): its own display already shows this info —
+        // don't duplicate. See TrinityForgeIntegration#isSuppressNativeCombatDisplayEnabled.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled()) return;
         if (location == null || location.getWorld() == null || player == null) return;
         if (!player.isOnline()) return;
 
@@ -569,6 +572,9 @@ public class BossHealthDisplay implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EliteMobDamagedByPlayerEvent event) {
+        // TrinityForge integration (fork spec item 3): its own display already shows this info —
+        // don't duplicate. See TrinityForgeIntegration#isSuppressNativeCombatDisplayEnabled.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled()) return;
         EliteEntity eliteEntity = event.getEliteMobEntity();
         if (!eliteEntity.isValid()) return;
 
@@ -598,6 +604,9 @@ public class BossHealthDisplay implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHeal(EliteMobHealEvent event) {
+        // TrinityForge integration (fork spec item 3): its own display already shows this info —
+        // don't duplicate. See TrinityForgeIntegration#isSuppressNativeCombatDisplayEnabled.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled()) return;
         EliteEntity eliteEntity = event.getEliteEntity();
         if (!eliteEntity.isValid()) return;
 
@@ -618,6 +627,9 @@ public class BossHealthDisplay implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onEnterCombat(EliteMobEnterCombatEvent event) {
+        // TrinityForge integration (fork spec item 3): its own display already shows this info —
+        // don't duplicate. See TrinityForgeIntegration#isSuppressNativeCombatDisplayEnabled.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled()) return;
         EliteEntity eliteEntity = event.getEliteMobEntity();
         if (!eliteEntity.isValid()) return;
 

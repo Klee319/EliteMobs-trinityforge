@@ -18,7 +18,19 @@ public class BossCustomAttackDamage {
                     ((Player) damagee).getGameMode().equals(GameMode.ADVENTURE))) return 0;
 
         PlayerDamagedByEliteMobEvent.PlayerDamagedByEliteMobEventFilter.setBypass(true);
-        damagee.damage(damage, damager);
+        if (damagee instanceof Player) {
+            // Custom power damage against a player is elite ABILITY damage: mark so the TrinityForge
+            // combat listener routes it through the MAGICAL component instead of treating the
+            // synthetic damage call as a melee hit.
+            com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.mark();
+            try {
+                damagee.damage(damage, damager);
+            } finally {
+                com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.clear();
+            }
+        } else {
+            damagee.damage(damage, damager);
+        }
         damagee.setNoDamageTicks(0);
 
         return damage;

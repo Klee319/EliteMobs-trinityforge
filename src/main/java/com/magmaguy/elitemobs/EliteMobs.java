@@ -306,6 +306,10 @@ public class EliteMobs extends JavaPlugin {
             VaultCompatibility.VAULT_ENABLED = false;
         }
 
+        //TrinityForge fork: detect TrinityForge and load delegation toggles before listeners register.
+        initializationContext.step("TrinityForge Integration");
+        com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.initialize(this);
+
         //Hook up all listeners, some depend on config
         initializationContext.step("Event Listeners");
         EventsRegistrer.registerEvents();
@@ -402,15 +406,24 @@ public class EliteMobs extends JavaPlugin {
         // directly into their isolated registry. Newer FMM picks it up via the
         // ServicesManager path above and ignores this side; harmless either way.
         if (Bukkit.getPluginManager().getPlugin("FreeMinecraftModels") != null) {
+            // TrinityForge fork note: the published FMM jar used at compile time does not
+            // expose com.magmaguy.freeminecraftmodels.api.LocationAPI (it was added in a later,
+            // unreleased FMM build), so the direct call no longer compiles. This bridge is an
+            // optional cross-plugin convenience (lets FMM Lua scripts see EM dungeons) and is
+            // unrelated to the TrinityForge integration, so it is invoked reflectively: it still
+            // works at runtime against any FMM that ships LocationAPI, and degrades to a warning
+            // otherwise — preserving the original guarded behaviour without a compile dependency.
             try {
-                com.magmaguy.freeminecraftmodels.api.LocationAPI.registerDungeonLocator(
-                        "EliteMobs", emDungeonLocator::contains);
-            } catch (NoClassDefFoundError e) {
-                // FMM too old to expose LocationAPI — older versions also lack
-                // the LocationOwnership ServicesManager path, so just warn.
+                Class<?> locationApi = Class.forName("com.magmaguy.freeminecraftmodels.api.LocationAPI");
+                java.util.function.Predicate<org.bukkit.Location> dungeonLocator = emDungeonLocator::contains;
+                locationApi.getMethod("registerDungeonLocator", String.class, java.util.function.Predicate.class)
+                        .invoke(null, "EliteMobs", dungeonLocator);
+            } catch (ClassNotFoundException | NoSuchMethodException e) {
                 Logger.warn("Failed to bridge dungeon locator into FreeMinecraftModels — the "
                         + "installed FMM jar is older than 2.4.0 (missing LocationAPI). "
                         + "is_in_dungeon in FMM scripts will not see EliteMobs dungeons.");
+            } catch (ReflectiveOperationException | NoClassDefFoundError e) {
+                Logger.warn("Failed to bridge dungeon locator into FreeMinecraftModels: " + e.getMessage());
             }
         }
         com.magmaguy.elitemobs.scripting.LuaEntityEnricher.register();
@@ -500,6 +513,10 @@ public class EliteMobs extends JavaPlugin {
     @Override
     public void onDisable() {
         MetadataHandler.shutdownRequested = true;
+        // TrinityForge fork: drop the whole in-memory hate table so nothing survives a reload.
+        com.magmaguy.elitemobs.trinityforge.HateTable.clearAll();
+        // TrinityForge fork: release cached TrinityForge service handles and mark integration unavailable.
+        com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.shutdown();
         MagmaCore.requestInitializationShutdown(this);
         if (MetadataHandler.pluginState == PluginState.INITIALIZING) {
             Bukkit.getServer().getScheduler().cancelTasks(MetadataHandler.PLUGIN);

@@ -13,6 +13,7 @@ import com.magmaguy.elitemobs.mobconstructor.EliteEntity;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.CustomBossEntity;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.RegionalBossEntity;
 import com.magmaguy.elitemobs.playerdata.database.PlayerData;
+import com.magmaguy.elitemobs.trinityforge.TrinityForgeLootListener;
 import com.magmaguy.elitemobs.utils.WeightedProbability;
 import com.magmaguy.magmacore.util.Logger;
 import org.bukkit.Location;
@@ -70,17 +71,25 @@ public class LootTables implements Listener {
 
             if (!(eliteEntity.isRandomLoot())) continue;
 
-            // Skill-based gear restriction now handles equipping, not drops
-            generateLoot(eliteEntity, player);
+            // Elite loot quality scales with this mob's strength (its reward level) and the receiving
+            // player's 幸運 (vanilla Luck effect + skilltree luck stat, 幸運1につきmode+1). Expose both to
+            // the TrinityForge stamp for the duration of this mob's synchronous loot generation, then clear.
+            TrinityForgeLootListener.beginDropContext(rewardLevel, player);
+            try {
+                // Skill-based gear restriction now handles equipping, not drops
+                generateLoot(eliteEntity, player);
 
-            if (SpecialItemSystemsConfig.isDropSpecialLoot()) {
-                if (eliteEntity instanceof CustomBossEntity customBossEntity &&
-                        customBossEntity.getCustomBossesConfigFields().getHealthMultiplier() > 1.0 &&
-                        ThreadLocalRandom.current().nextDouble() < SpecialItemSystemsConfig.getBossChanceToDrop())
-                    generateSpecialLoot(player, 0, eliteEntity);
-                else if (eliteEntity instanceof CustomBossEntity &&
-                        ThreadLocalRandom.current().nextDouble() < SpecialItemSystemsConfig.getNonEliteChanceToDrop())
-                    generateSpecialLoot(player, 0, eliteEntity);
+                if (SpecialItemSystemsConfig.isDropSpecialLoot()) {
+                    if (eliteEntity instanceof CustomBossEntity customBossEntity &&
+                            customBossEntity.getCustomBossesConfigFields().getHealthMultiplier() > 1.0 &&
+                            ThreadLocalRandom.current().nextDouble() < SpecialItemSystemsConfig.getBossChanceToDrop())
+                        generateSpecialLoot(player, 0, eliteEntity);
+                    else if (eliteEntity instanceof CustomBossEntity &&
+                            ThreadLocalRandom.current().nextDouble() < SpecialItemSystemsConfig.getNonEliteChanceToDrop())
+                        generateSpecialLoot(player, 0, eliteEntity);
+                }
+            } finally {
+                TrinityForgeLootListener.endDropContext();
             }
 
             if (ItemSettingsConfig.isUseEliteItemScrolls() &&
@@ -378,11 +387,17 @@ public class LootTables implements Listener {
     }
 
     private static void addToInventoryOrDrop(Player player, ItemStack itemStack) {
+        // Stamp before the item reaches the player: this is the actual elite-loot distribution point
+        // (see TrinityForgeLootListener javadoc for why EliteMobDeathEvent#getDrops() cannot be used instead).
+        TrinityForgeLootListener.stampLootDrop(itemStack);
         HashMap<Integer, ItemStack> leftOvers = player.getInventory().addItem(itemStack);
         leftOvers.values().forEach(leftOver -> player.getWorld().dropItem(player.getLocation(), leftOver));
     }
 
     private static void processPhysicalItem(Location location, ItemStack itemStack, Player player) {
+        // Stamp before the item reaches the player: this is the actual elite-loot distribution point
+        // (see TrinityForgeLootListener javadoc for why EliteMobDeathEvent#getDrops() cannot be used instead).
+        TrinityForgeLootListener.stampLootDrop(itemStack);
         Item item = location.getWorld().dropItem(location, itemStack);
         if (item.getItemStack().hasItemMeta() && item.getItemStack().getItemMeta().hasDisplayName()) {
             item.setCustomName(item.getItemStack().getItemMeta().getDisplayName());
@@ -396,6 +411,9 @@ public class LootTables implements Listener {
         CustomItem customItem = WeightedProbability.pickWeighedProbabilityFromCustomItems(SpecialItemSystemsConfig.getSpecialValues());
         if (customItem == null) return;
         ItemStack specialItem = customItem.generateItemStack(level, player, eliteEntity);
+        // Stamp before the item reaches the player: this is the actual elite-loot distribution point
+        // (see TrinityForgeLootListener javadoc for why EliteMobDeathEvent#getDrops() cannot be used instead).
+        TrinityForgeLootListener.stampLootDrop(specialItem);
         if (ItemSettingsConfig.isPutLootDirectlyIntoPlayerInventory()) {
             HashMap<Integer, ItemStack> leftOvers = player.getInventory().addItem(specialItem);
             leftOvers.values().forEach(leftOver -> player.getWorld().dropItem(player.getLocation(), leftOver));

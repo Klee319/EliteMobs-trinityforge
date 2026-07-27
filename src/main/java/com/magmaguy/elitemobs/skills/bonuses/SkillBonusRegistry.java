@@ -1,8 +1,6 @@
 package com.magmaguy.elitemobs.skills.bonuses;
 
-import com.magmaguy.elitemobs.playerdata.database.PlayerData;
 import com.magmaguy.elitemobs.skills.SkillType;
-import com.magmaguy.elitemobs.skills.SkillXPCalculator;
 import org.bukkit.entity.Player;
 
 import java.util.*;
@@ -258,8 +256,9 @@ public class SkillBonusRegistry {
      * Helper method to get a player's skill level.
      */
     public static int getPlayerSkillLevel(Player player, SkillType skillType) {
-        long xp = PlayerData.getSkillXP(player.getUniqueId(), skillType);
-        return SkillXPCalculator.levelFromTotalXP(xp);
+        // Phase 6(2026-07-18): 武器スキルレベリングは無力化。進行はTF/ValhallaMMOに一本化。
+        // procスキルコードは残置(レベル0で実質不発)。常に0を返し発動強度の源を断つ。
+        return 0;
     }
 
     /**

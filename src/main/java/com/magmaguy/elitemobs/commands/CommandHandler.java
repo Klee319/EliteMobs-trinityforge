@@ -80,22 +80,35 @@ public class CommandHandler {
         emCommand.registerCommand(new PeaceBannerGiveCommand());
         emCommand.registerCommand(new PeaceBannerListCommand());
 
-        //User commands
-//        emCommand.registerCommand(new AdventurersGuildCommand());
-        emCommand.registerCommand(new ShareItemCommand());
-        emCommand.registerCommand(new ShopDynamicCommand());
-        emCommand.registerCommand(new ShopCustomCommand());
-        emCommand.registerCommand(new RepairCommand());
-        emCommand.registerCommand(new EnchantCommand());
-        emCommand.registerCommand(new EliteScrollCommand());
-        emCommand.registerCommand(new ScrollGetCommand());
-        emCommand.registerCommand(new ScrapCommand());
-        emCommand.registerCommand(new UnbindCommand());
-        emCommand.registerCommand(new MoneyCheckCommand());
-        emCommand.registerCommand(new QuestAcceptCommand());
-        emCommand.registerCommand(new QuestCheckCommand());
-        emCommand.registerCommand(new QuestTrackCommand());
-        emCommand.registerCommand(new QuestLeaveCommand());
+        //User commands — when TrinityForge is present these player-economy/progression menus are
+        // owned by TF/Valhalla; keep admin tooling above, skip registering the user surface here.
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isAvailable()) {
+            emCommand.registerCommand(new ShareItemCommand());
+            emCommand.registerCommand(new ShopDynamicCommand());
+            emCommand.registerCommand(new ShopCustomCommand());
+            emCommand.registerCommand(new RepairCommand());
+            emCommand.registerCommand(new EnchantCommand());
+            emCommand.registerCommand(new EliteScrollCommand());
+            emCommand.registerCommand(new ScrollGetCommand());
+            emCommand.registerCommand(new ScrapCommand());
+            emCommand.registerCommand(new UnbindCommand());
+            emCommand.registerCommand(new MoneyCheckCommand());
+            emCommand.registerCommand(new QuestAcceptCommand());
+            emCommand.registerCommand(new QuestCheckCommand());
+            emCommand.registerCommand(new QuestTrackCommand());
+            emCommand.registerCommand(new QuestLeaveCommand());
+            emCommand.registerCommand(new LootCommand());
+            emCommand.registerCommand(new PayCommand());
+            emCommand.registerCommand(new AdventurersGuildArgCommand());
+            emCommand.registerCommand(new NPCQuestList());
+            adventurersGuildCommand = new CommandManager(MetadataHandler.PLUGIN, "adventurersguild");
+            adventurersGuildCommand.registerCommand(new AdventurersGuildCommand());
+        } else {
+            adventurersGuildCommand = null;
+        }
+
+        // Soft-disabled under TF (execute() already no-ops / redirects) but still registered for
+        // admin discovery / message consistency.
         emCommand.registerCommand(new SkillSetCommand());
         emCommand.registerCommand(new SkillSetAllCommand());
         emCommand.registerCommand(new SkillCheckCommand());
@@ -103,7 +116,6 @@ public class CommandHandler {
         emCommand.registerCommand(new SkillTestTypeCommand());
         emCommand.registerCommand(new SkillTestCancelCommand());
         emCommand.registerCommand(new SkillTestResultsCommand());
-        emCommand.registerCommand(new LootCommand());
         emCommand.registerCommand(new QuitCommand());
         emCommand.registerCommand(new StartCommand());
         emCommand.registerCommand(new ArenaCommand());
@@ -113,14 +125,8 @@ public class CommandHandler {
         emCommand.registerCommand(new DungeonTeleportCommand());
         emCommand.registerCommand(new DungeonTeleportDialogCommand());
         emCommand.registerCommand(new TrackBossCommand());
-        emCommand.registerCommand(new PayCommand());
-        emCommand.registerCommand(new AdventurersGuildArgCommand());
-        emCommand.registerCommand(new NPCQuestList());
 
         emCommand.registerCommand(new EliteMobsCommand());
         emCommand.registerCommand(new HelpCommand());
-
-        adventurersGuildCommand =new CommandManager(MetadataHandler.PLUGIN, "adventurersguild");
-        adventurersGuildCommand.registerCommand(new AdventurersGuildCommand());
     }
 }

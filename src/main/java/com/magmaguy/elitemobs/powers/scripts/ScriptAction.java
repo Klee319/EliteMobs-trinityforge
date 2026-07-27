@@ -490,10 +490,18 @@ public class ScriptAction {
                 if (target instanceof Player) {
                     PlayerDamagedByEliteMobEvent.PlayerDamagedByEliteMobEventFilter.setSpecialMultiplier(multiplier);
 
-                    if (scriptActionData.getEliteEntity().getLivingEntity() != null) {
-                        target.damage(damageAmount, scriptActionData.getEliteEntity().getLivingEntity());
-                    } else {
-                        target.damage(damageAmount);
+                    // Script DAMAGE = elite ability damage: mark it so the TrinityForge combat listener can
+                    // route it through the MAGICAL component (魔法耐性) instead of treating the synthetic
+                    // target.damage(...) call as a melee hit. Synchronous; always cleared in finally.
+                    com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.mark();
+                    try {
+                        if (scriptActionData.getEliteEntity().getLivingEntity() != null) {
+                            target.damage(damageAmount, scriptActionData.getEliteEntity().getLivingEntity());
+                        } else {
+                            target.damage(damageAmount);
+                        }
+                    } finally {
+                        com.magmaguy.elitemobs.trinityforge.TrinityForgeAbilityDamage.clear();
                     }
                 } else {
                     if (scriptActionData.getEliteEntity().getLivingEntity() != null) {

@@ -222,6 +222,11 @@ public class WeaponOffenseCalculator {
      * @return The weapon adjustment multiplier
      */
     public static double getWeaponAdjustment(double weaponLevel, int mobLevel) {
+        // TrinityForge fork (spec section 1): when gear neutralization is active, the weapon-tier multiplier
+        // is short-circuited to an identity value so raw player->mob damage is gear-independent. The mob-level
+        // scaling stays in LevelScaling and the final number is owned by TrinityForge's pipeline.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isGearNeutralizationEnabled())
+            return com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.NEUTRAL_GEAR_MULTIPLIER;
         if (mobLevel <= 0) mobLevel = 1;
 
         double bonus;

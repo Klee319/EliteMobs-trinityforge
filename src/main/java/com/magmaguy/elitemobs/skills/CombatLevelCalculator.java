@@ -31,6 +31,19 @@ public class CombatLevelCalculator {
      * @return The calculated combat level
      */
     public static int calculateCombatLevel(UUID playerUUID) {
+        // TrinityForge fork (spec section 3): the gear/skill-tier combat level is replaced with TrinityForge's
+        // mapping (average of the combat-job skill-tree levels read from ValhallaMMO). EliteMobs no longer
+        // derives combat level from its own item/skill XP when delegation is active.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isCombatLevelMappingEnabled()) {
+            try {
+                return com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.combatService().combatLevelOf(playerUUID);
+            } catch (NoClassDefFoundError | RuntimeException e) {
+                com.magmaguy.magmacore.util.Logger.warn(
+                        "TrinityForge combat-level mapping failed, using EliteMobs' own combat level: " + e.getMessage());
+                // fall through to EliteMobs' native calculation
+            }
+        }
+
         // Get all weapon skill levels
         List<Integer> weaponLevels = new ArrayList<>();
 

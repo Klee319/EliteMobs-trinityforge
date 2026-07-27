@@ -50,6 +50,13 @@ public class DynamicDungeonInstance extends DungeonInstance {
                 return;
             }
 
+        // TrinityForge combat-level entry gate, checked before the (expensive) world clone and before any
+        // participant/instance state is created. Keyed by the dungeon's content-package filename, not the
+        // dynamically numbered instance world it is about to clone into (fork spec section 6).
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener.checkDungeonEntryAllowed(
+                player, dynamicDungeonConfigFields.getFilename()))
+            return;
+
         String instancedWorldName = WorldInstantiator.getNewWorldName(dynamicDungeonConfigFields.getWorldName());
 
         if (!launchEvent(dynamicDungeonConfigFields, instancedWorldName, player)) return;

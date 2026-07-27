@@ -114,6 +114,9 @@ dependencies {
     }
     // Mythic Mobs integration - currently only for arenas
     compileOnly group: 'io.lumine', name: 'Mythic-Dist', version: '5.3.5'
+    // TrinityForge integration API (fork): compile against the shipped API jar; provided at
+    // runtime by the installed TrinityForge plugin (softdepend). Never shaded.
+    compileOnly files('libs/TrinityForge.jar')
 
     ///Shaded in
     implementation group: 'org.bstats', name: 'bstats-bukkit', version: '3.0.2'
@@ -123,6 +126,9 @@ dependencies {
     }
     testImplementation "org.spigotmc:spigot-api:1.21.11-R0.1-SNAPSHOT"
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    // TrinityForge integration API on the test classpath so the fork's trinityforge glue classes
+    // (which reference com.trinityforge.* types) can be loaded and reflected on in unit tests.
+    testImplementation files('libs/TrinityForge.jar')
 
 }
 

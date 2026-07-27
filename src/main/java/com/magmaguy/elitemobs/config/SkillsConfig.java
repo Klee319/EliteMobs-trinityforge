@@ -65,8 +65,10 @@ public class SkillsConfig extends ConfigurationFile {
 
         showCombatLevelDisplay = ConfigurationEngine.setBoolean(
                 List.of("Whether to show a combat level display above players.",
-                        "Combat level is the average of the two highest weapon skills and armor."),
-                fileConfiguration, "showCombatLevelDisplay", true);
+                        "Combat level is the average of the two highest weapon skills and armor.",
+                        "Disabled by default (2026-07-22): the mounted packet display could be left",
+                        "floating at the death location when its owner died."),
+                fileConfiguration, "showCombatLevelDisplay", false);
 
         showXPBar = ConfigurationEngine.setBoolean(
                 List.of("Whether to show an animated XP progress bar when gaining skill XP.",

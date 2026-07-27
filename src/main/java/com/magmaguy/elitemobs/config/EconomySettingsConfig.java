@@ -120,8 +120,9 @@ public class EconomySettingsConfig extends ConfigurationFile {
                 file, fileConfiguration, "currencyName", "Elite Coins", true);
         useVault = ConfigurationEngine.setBoolean(
                 List.of("Whether to use Vault for the economy instead of the built-in system.",
-                        "NOT RECOMMENDED! See: https://wiki.nightbreak.io/EliteMobs/vault"),
-                fileConfiguration, "useVault", false);
+                        "TrinityForge構成では既定で有効です。Vaultプラグイン(及び対応する経済プラグイン)が",
+                        "導入されていない場合は自動的に内蔵通貨システムへフォールバックします。"),
+                fileConfiguration, "useVault", true);
         enableCurrencyShower = ConfigurationEngine.setBoolean(
                 List.of("Whether elites drop currency (coins) on death."),
                 fileConfiguration, "enableCurrencyShower", true);

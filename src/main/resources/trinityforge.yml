@@ -1,0 +1,73 @@
+# TrinityForge integration toggles for this EliteMobs fork.
+#
+# These are INTEGRATION SWITCHES, not balance numbers. All damage/defense/loot/level balance
+# lives in TrinityForge's own configuration files (combat/*.yml, dungeon/themes.yml, etc.).
+# When TrinityForge is not installed every toggle is ignored and EliteMobs runs standalone.
+
+# Short-circuit EliteMobs' gear-tier damage and defense multipliers to gear-independent values
+# (weapon/armor tier no longer changes raw damage). Spec section 1.
+gear-neutralization: true
+
+# Recompute the final damage of every elite combat interaction through TrinityForge's symmetric
+# pipeline (physical/magical final damage). Spec section 2.
+combat-delegation: true
+
+# Replace EliteMobs' internal combat-level source with TrinityForge's skill-tree mapping
+# (combatLevelOf). Spec section 3.
+combat-level-mapping: true
+
+# Stamp each spawned elite mob's PDC with its TrinityForge defense profile (level, dungeon theme,
+# physical/magical defense). Spec section 7.
+spawn-profile-stamp: true
+
+# Drive each elite mob's MAX HEALTH from its TrinityForge profile (combat/mob-profiles.yml
+# `max-health`) instead of EliteMobs' own exponential level scaling. Only mobs whose profile sets a
+# non-zero max-health are affected; every other mob keeps its EliteMobs HP. Applied at every EliteMobs
+# HP write (spawn, full-heal, phase-boss reset) so HP stays consistent mid-fight (敵HPをTF化).
+hp-delegation: true
+
+# Stamp dropped items with a TrinityForge rollSeed + quality so their stats are derived (and can be
+# re-derived on reload) instead of baked. Spec section 5.
+loot-stat-stamp: true
+
+# Hate-based targeting: redirect elite targeting to the highest-hate player. Spec section 4.
+hate-targeting: true
+
+# Disable repair of EliteMobs items so durability is a finite resource (spec section 8, "修繕廃止").
+# Blocks the EliteMobs custom scrap-repair menu and vanilla anvil/mending repair of elite items.
+repair-disabled: true
+
+# Mirror EliteMobs soulbinds into TrinityForge ItemData (bind type SOULBOUND + owner UUID) so
+# TrinityForge sees the same binding (spec section 8). The EliteMobs binding itself is unchanged.
+soulbind-bridge: true
+
+# Suppress EliteMobs' own native combat displays (health bars, numeric HP, boss bars, damage/heal/XP
+# popups, and the vanilla nametag) so they don't duplicate TrinityForge's own FocusHp/DamagePopup
+# systems. Missing key = suppression ON (default true) so upgrading servers get the fix automatically
+# without editing this file. Only takes effect while TrinityForge is detected; in standalone mode
+# (TrinityForge absent) EliteMobs always keeps its native displays regardless of this setting.
+suppress-native-combat-display: true
+
+# Gate equipping by an item's TrinityForge useLevelRequirement against the player's combat level
+# (spec section 8). COARSE placeholder: TrinityForge's public API does not yet expose per-skill
+# ValhallaMMO levels, so this compares against the combat-level average. Off by default; the check
+# fails open (allows use) on any error or missing requirement.
+use-level-restriction: false
+
+# Block dungeon entry below a required combat level. Spec section 6.
+# The required levels are an integration table (which dungeon needs which level), keyed by the dungeon's
+# content-package filename (its stable logical/blueprint name — e.g. "my_dungeon" for
+# content_packages/my_dungeon.yml, NOT the dynamically numbered instance world it clones into, like
+# my_dungeon_3). This gate is checked directly when a player creates or joins an instanced dungeon, so it
+# always applies regardless of the teleport-timer setting below.
+# For dungeons only ever reached through a plain teleport (command/NPC, no dungeon instance), the fallback
+# gate below matches on the destination world name instead — list that world's name here if it needs gating.
+# Leave empty (or enabled: false) to disable gating entirely.
+dungeon-entry-gate:
+  enabled: false
+  required-combat-level: {}
+    # my_dungeon: 20
+    # example_dungeon_world: 20
+  # Message sent to a player who is denied dungeon entry by the gate. Supports legacy '&' color codes
+  # (converted through EliteMobs' standard ChatColorConverter) and the {required}/{current} placeholders.
+  message: "&cYou need combat level &e{required}&c to enter this dungeon (yours: &e{current}&c)."

@@ -36,27 +36,15 @@ public class GearRestrictionHandler {
      * @return true if the player can equip, false if restricted
      */
     public static boolean canEquip(Player player, ItemStack itemStack) {
-        if (!AdventurersGuildConfig.isSkillBasedGearRestriction()) return true;
         if (itemStack == null || itemStack.getType().isAir()) return true;
-        if (!EliteItemManager.isEliteMobsItem(itemStack)) return true;
-
-        // Get the item's level
-        int itemLevel = EliteItemManager.getRoundedItemLevel(itemStack);
-        if (itemLevel <= 0) return true;
-
-        // Items level 20 or below can be used by anyone - no restriction
-        if (itemLevel <= 20) return true;
-
-        // Determine which skill type this item belongs to
-        SkillType skillType = SkillType.fromMaterialIncludingArmor(itemStack.getType());
-        if (skillType == null) return true;
-
-        // Get the player's skill level for this type
-        long skillXP = PlayerData.getSkillXP(player.getUniqueId(), skillType);
-        int playerSkillLevel = SkillXPCalculator.levelFromTotalXP(skillXP);
-
-        // Player can equip if their skill level is >= item level
-        return playerSkillLevel >= itemLevel;
+        // Fork: coarse TrinityForge use-level gate (config-gated, default off; fails open). Independent of
+        // EliteMobs' own skill-based gear restriction below, so it can apply even when that is disabled.
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeUseRequirement.canUse(player, itemStack)) return false;
+        // Phase 6(2026-07-18): 武器スキルは無力化済み(PlayerData.getSkillXP は常時0)。スキル依存の装備制限を
+        // そのまま残すと、全プレイヤーのスキルレベルが0となり Lv20超の elite アイテムを誰も装備できなくなる
+        // (下の playerSkillLevel(=0) >= itemLevel が常に false)。ロックアウトを避けるため、スキル基準の装備
+        // 制限は無効化する。進行の門番はTF/ValhallaMMOへ一本化。TFの使用レベルゲート(上の canUse)は独立して有効。
+        return true;
     }
 
     /**

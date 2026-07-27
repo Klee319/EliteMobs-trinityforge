@@ -1,12 +1,7 @@
 package com.magmaguy.elitemobs.commands;
 
 import com.magmaguy.elitemobs.config.CommandMessagesConfig;
-import com.magmaguy.elitemobs.config.menus.premade.SkillBonusMenuConfig;
-import com.magmaguy.elitemobs.playerdata.database.PlayerData;
-import com.magmaguy.elitemobs.skills.ArmorSkillHealthBonus;
-import com.magmaguy.elitemobs.skills.CombatLevelDisplay;
 import com.magmaguy.elitemobs.skills.SkillType;
-import com.magmaguy.elitemobs.skills.SkillXPCalculator;
 import com.magmaguy.magmacore.command.AdvancedCommand;
 import com.magmaguy.magmacore.command.CommandData;
 import com.magmaguy.magmacore.command.arguments.IntegerCommandArgument;
@@ -45,9 +40,8 @@ public class SkillSetCommand extends AdvancedCommand {
             return;
         }
 
-        SkillType skillType;
         try {
-            skillType = SkillType.valueOf(skillTypeName.toUpperCase());
+            SkillType.valueOf(skillTypeName.toUpperCase());
         } catch (IllegalArgumentException e) {
             Logger.sendMessage(commandData.getCommandSender(), CommandMessagesConfig.getSkillInvalidTypeMessage().replace("$type", skillTypeName));
             Logger.sendMessage(commandData.getCommandSender(), CommandMessagesConfig.getSkillValidTypesMessage()
@@ -60,29 +54,11 @@ public class SkillSetCommand extends AdvancedCommand {
             return;
         }
 
-        if (level > 100) {
-            Logger.sendMessage(commandData.getCommandSender(), CommandMessagesConfig.getSkillLevelWarningMessage().replace("$level", String.valueOf(level)));
-        }
-
-        // Calculate the XP needed for the target level
-        long targetXP = SkillXPCalculator.totalXPForLevel(level);
-
-        // Set the player's skill XP
-        PlayerData.setSkillXP(targetPlayer.getUniqueId(), skillType, targetXP);
-
-        // Update combat level display
-        CombatLevelDisplay.updateDisplay(targetPlayer);
-
-        // Update armor health bonus if armor skill was changed
-        if (skillType == SkillType.ARMOR) {
-            ArmorSkillHealthBonus.updateHealthBonus(targetPlayer);
-        }
-
+        // 武器スキルはTrinityForgeへ一本化済み。
+        // PlayerData.setSkillXPは常にno-opのため、ここで実行すると
+        // 実際には何も変更されないのに成功メッセージだけ表示される「偽の成功」になる。
+        // それを避けるため、明示的な無効化メッセージを返して処理を打ち切る。
         Logger.sendMessage(commandData.getCommandSender(),
-                CommandMessagesConfig.getSkillSetSuccessMessage()
-                        .replace("$player", targetPlayer.getName())
-                        .replace("$skill", SkillBonusMenuConfig.getSkillTypeDisplayName(skillType))
-                        .replace("$level", String.valueOf(level))
-                        .replace("$xp", String.valueOf(targetXP)));
+                "武器スキルはTrinityForgeへ一本化されているため、このEliteMobsコマンドは無効です。");
     }
 }

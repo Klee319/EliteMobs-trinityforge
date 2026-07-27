@@ -1,11 +1,6 @@
 package com.magmaguy.elitemobs.commands;
 
 import com.magmaguy.elitemobs.config.CommandMessagesConfig;
-import com.magmaguy.elitemobs.playerdata.database.PlayerData;
-import com.magmaguy.elitemobs.skills.ArmorSkillHealthBonus;
-import com.magmaguy.elitemobs.skills.CombatLevelDisplay;
-import com.magmaguy.elitemobs.skills.SkillType;
-import com.magmaguy.elitemobs.skills.SkillXPCalculator;
 import com.magmaguy.magmacore.command.AdvancedCommand;
 import com.magmaguy.magmacore.command.CommandData;
 import com.magmaguy.magmacore.command.arguments.IntegerCommandArgument;
@@ -43,28 +38,11 @@ public class SkillSetAllCommand extends AdvancedCommand {
             return;
         }
 
-        if (level > 100) {
-            Logger.sendMessage(commandData.getCommandSender(), CommandMessagesConfig.getSkillLevelWarningMessage().replace("$level", String.valueOf(level)));
-        }
-
-        // Calculate the XP needed for the target level
-        long targetXP = SkillXPCalculator.totalXPForLevel(level);
-
-        // Set all skills
-        for (SkillType skillType : SkillType.values()) {
-            PlayerData.setSkillXP(targetPlayer.getUniqueId(), skillType, targetXP);
-        }
-
-        // Update combat level display
-        CombatLevelDisplay.updateDisplay(targetPlayer);
-
-        // Update armor health bonus (since armor skill was changed)
-        ArmorSkillHealthBonus.updateHealthBonus(targetPlayer);
-
+        // 武器スキルはTrinityForgeへ一本化済み。
+        // PlayerData.setSkillXPは常にno-opのため、ここで実行すると
+        // 実際には何も変更されないのに成功メッセージだけ表示される「偽の成功」になる。
+        // それを避けるため、明示的な無効化メッセージを返して処理を打ち切る。
         Logger.sendMessage(commandData.getCommandSender(),
-                CommandMessagesConfig.getSkillSetAllSuccessMessage()
-                        .replace("$player", targetPlayer.getName())
-                        .replace("$level", String.valueOf(level))
-                        .replace("$xp", String.valueOf(targetXP)));
+                "武器スキルはTrinityForgeへ一本化されているため、このEliteMobsコマンドは無効です。");
     }
 }

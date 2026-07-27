@@ -35,6 +35,12 @@ public class RepairMenu extends EliteMenu {
     }
 
     private static void calculateOutput(Inventory repairInventory) {
+        // Fork: when TrinityForge wants durability to be a finite resource, the custom scrap-repair path
+        // produces no output (no-op when TF absent / repair-disabled toggle off). Spec section 8.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isRepairDisabled()) {
+            repairInventory.setItem(RepairMenuConfig.outputSlot, null);
+            return;
+        }
         if (repairInventory.getItem(RepairMenuConfig.eliteScrapInputSlot) == null || repairInventory.getItem(RepairMenuConfig.eliteItemInputSlot) == null) {
             repairInventory.setItem(RepairMenuConfig.outputSlot, null);
             return;

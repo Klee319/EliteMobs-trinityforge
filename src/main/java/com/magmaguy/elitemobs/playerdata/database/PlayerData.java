@@ -522,10 +522,9 @@ public class PlayerData {
      * @return The total XP for that skill
      */
     public static long getSkillXP(UUID uuid, SkillType skillType) {
-        String columnName = skillType.getColumnName();
-        if (!isInMemory(uuid))
-            return getDatabaseLong(uuid, columnName);
-        return getSkillXPByType(playerDataHashMap.get(uuid), skillType);
+        // Phase 6(2026-07-18): 武器スキルレベリングは無力化。進行はTF/ValhallaMMOに一本化。
+        // procスキルコードは残置(レベル0で実質不発)。常に0を返しレベリング入力を断つ。
+        return 0L;
     }
 
     /**
@@ -536,10 +535,8 @@ public class PlayerData {
      * @param xp        The new total XP value
      */
     public static void setSkillXP(UUID uuid, SkillType skillType, long xp) {
-        String columnName = skillType.getColumnName();
-        setDatabaseValue(uuid, columnName, xp);
-        if (playerDataHashMap.containsKey(uuid))
-            setSkillXPByType(playerDataHashMap.get(uuid), skillType, xp);
+        // Phase 6(2026-07-18): 武器スキルレベリングは無力化。進行はTF/ValhallaMMOに一本化。
+        // procスキルコードは残置(レベル0で実質不発)。書き込みをno-op化。
     }
 
     /**
@@ -551,10 +548,9 @@ public class PlayerData {
      * @return The new total XP for that skill
      */
     public static long addSkillXP(UUID uuid, SkillType skillType, long xpToAdd) {
-        long currentXP = getSkillXP(uuid, skillType);
-        long newXP = currentXP + xpToAdd;
-        setSkillXP(uuid, skillType, newXP);
-        return newXP;
+        // Phase 6(2026-07-18): 武器スキルレベリングは無力化。進行はTF/ValhallaMMOに一本化。
+        // procスキルコードは残置(レベル0で実質不発)。加算をno-op化。
+        return 0L;
     }
 
     /**
@@ -590,25 +586,17 @@ public class PlayerData {
      * @return The skill level (1-100+)
      */
     public static int getSkillLevel(UUID uuid, SkillType skillType) {
-        long xp = getSkillXP(uuid, skillType);
-        return com.magmaguy.elitemobs.skills.SkillXPCalculator.levelFromTotalXP(xp);
+        // Phase 6(2026-07-18): 武器スキルレベリングは無力化。進行はTF/ValhallaMMOに一本化。
+        // procスキルコードは残置(レベル0で実質不発)。常に0を返す。
+        return 0;
     }
 
     /**
      * Helper method to get skill XP from a PlayerData instance by SkillType.
+     * Phase 6(2026-07-18): 武器スキルレベリングは無力化。呼び出し元が無くなったため常に0を返す。
      */
     private static long getSkillXPByType(PlayerData playerData, SkillType skillType) {
-        return switch (skillType) {
-            case ARMOR -> playerData.skillXP_ARMOR;
-            case SWORDS -> playerData.skillXP_SWORDS;
-            case AXES -> playerData.skillXP_AXES;
-            case BOWS -> playerData.skillXP_BOWS;
-            case CROSSBOWS -> playerData.skillXP_CROSSBOWS;
-            case TRIDENTS -> playerData.skillXP_TRIDENTS;
-            case HOES -> playerData.skillXP_HOES;
-            case MACES -> playerData.skillXP_MACES;
-            case SPEARS -> playerData.skillXP_SPEARS;
-        };
+        return 0L;
     }
 
     /**

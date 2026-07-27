@@ -491,6 +491,11 @@ public class ArmorDefenseCalculator {
      * @return The gear adjustment multiplier (range: [0.5, 2.0])
      */
     public static double getGearAdjustment(double gearScore, int mobLevel) {
+        // TrinityForge fork (spec section 1): when gear neutralization is active, the armor-tier reduction is
+        // short-circuited to the "matched gear" identity multiplier (1.0) so mob->player damage is
+        // gear-independent. TrinityForge then applies the real defense (defense rate %, flat defense, etc.).
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isGearNeutralizationEnabled())
+            return com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.NEUTRAL_GEAR_MULTIPLIER;
         return 2.0 * (1.0 - getGearReduction(gearScore, mobLevel));
     }
 

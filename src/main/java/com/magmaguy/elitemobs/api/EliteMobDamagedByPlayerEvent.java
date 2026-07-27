@@ -1080,17 +1080,13 @@ public class EliteMobDamagedByPlayerEvent extends EliteDamageEvent {
                 breakdown.setCombatMultiplier(combatMultiplier);
             }
 
-            // Critical hit
+            // Critical hit — TrinityForge crit一本化(#3): crit判定はスキル発動(VorpalStrike等)/ダメージ
+            // ポップアップ用に残すが、ダメージ倍率(旧 ×1.5)はここでは適用しない。委譲時、elite相手のcritダメージは
+            // TrinityForgeCombatListener がプレイヤーの実 AttackStats(TF crit stat)を対称パイプラインへ渡して支配する。
+            // (非委譲=TF不在のスタンドアロン縮退モードでは crit 倍率無し=フラットになる。)
             boolean criticalHit = false;
             if (validPlayer) {
                 criticalHit = isCriticalHit(player);
-                if (criticalHit) {
-                    damage *= 1.5;
-                    if (breakdown != null) {
-                        breakdown.setCriticalHit(true);
-                        breakdown.setCritMultiplier(1.5);
-                    }
-                }
 
                 // Debug logging for combat balance tuning
                 DebugMessage.log(player, "[Combat] SkillLv" + getPlayerWeaponSkillLevel(player) +

@@ -43,6 +43,8 @@ public class SoulbindEnchantment extends CustomEnchantment {
         ItemMeta itemMeta = itemStack.getItemMeta();
         itemMeta.getPersistentDataContainer().set(SOULBIND_KEY, PersistentDataType.STRING, player.getUniqueId().toString());
         setPrestigeLevel(itemMeta, 0);
+        // Fork: mirror the soulbind into TrinityForge ItemData (no-op when TF absent / toggle off).
+        com.magmaguy.elitemobs.trinityforge.TrinityForgeBindingBridge.applySoulbound(itemMeta, player.getUniqueId());
         itemStack.setItemMeta(itemMeta);
         new EliteItemLore(itemStack, true);
         return itemStack;

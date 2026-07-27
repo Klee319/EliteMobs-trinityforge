@@ -105,6 +105,13 @@ public class DungeonInstance extends MatchInstance {
                 return;
             }
 
+        // TrinityForge combat-level entry gate, checked before the (expensive) world clone and before any
+        // participant/instance state is created. Keyed by the dungeon's content-package filename, not the
+        // dynamically numbered instance world it is about to clone into (fork spec section 6).
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener.checkDungeonEntryAllowed(
+                player, instancedDungeonsConfigFields.getFilename()))
+            return;
+
         String instancedWorldName = WorldInstantiator.getNewWorldName(instancedDungeonsConfigFields.getWorldName());
 
         if (!launchEvent(instancedDungeonsConfigFields, instancedWorldName, player)) return;
@@ -171,6 +178,15 @@ public class DungeonInstance extends MatchInstance {
 
     @Override
     public boolean addNewPlayer(Player player) {
+        // TrinityForge combat-level entry gate. This runs for every join of this instance — the initial creator
+        // (called from the constructor, redundant with but harmless after the setup-time check above) and every
+        // later party member joining an already-running instance from the dungeon browser menus, neither of
+        // which goes through PlayerPreTeleportEvent (fork spec section 6 / design-inconsistency notes a & b).
+        // Placed before super.addNewPlayer() so a denial happens before the participant list / PlayerData / the
+        // scheduled teleport are touched.
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener.checkDungeonEntryAllowed(
+                player, contentPackagesConfigFields.getFilename()))
+            return false;
         if (!super.addNewPlayer(player)) return false;
         if (levelSync > 0)
             player.sendMessage(DungeonsConfig.getDungeonDifficultyMessage().replace("$difficulty", difficultyName).replace("$levelSync", String.valueOf(levelSync)));

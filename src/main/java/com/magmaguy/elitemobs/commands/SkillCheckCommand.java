@@ -1,10 +1,6 @@
 package com.magmaguy.elitemobs.commands;
 
 import com.magmaguy.elitemobs.config.CommandMessagesConfig;
-import com.magmaguy.elitemobs.config.menus.premade.SkillBonusMenuConfig;
-import com.magmaguy.elitemobs.playerdata.database.PlayerData;
-import com.magmaguy.elitemobs.skills.SkillType;
-import com.magmaguy.elitemobs.skills.SkillXPCalculator;
 import com.magmaguy.magmacore.command.AdvancedCommand;
 import com.magmaguy.magmacore.command.CommandData;
 import com.magmaguy.magmacore.command.arguments.PlayerCommandArgument;
@@ -34,31 +30,11 @@ public class SkillCheckCommand extends AdvancedCommand {
             return;
         }
 
-        Logger.sendSimpleMessage(commandData.getCommandSender(), CommandMessagesConfig.getSkillCheckHeaderMessage().replace("$player", targetPlayer.getName()));
-
-        for (SkillType skillType : SkillType.values()) {
-            long xp = PlayerData.getSkillXP(targetPlayer.getUniqueId(), skillType);
-            int level = SkillXPCalculator.levelFromTotalXP(xp);
-            long xpProgress = SkillXPCalculator.xpProgressInCurrentLevel(xp);
-            long xpNeeded = SkillXPCalculator.xpToNextLevel(level);
-            double progress = SkillXPCalculator.levelProgress(xp) * 100;
-
-            Logger.sendSimpleMessage(commandData.getCommandSender(),
-                    CommandMessagesConfig.getSkillCheckEntryFormat()
-                            .replace("$skill", SkillBonusMenuConfig.getSkillTypeDisplayName(skillType))
-                            .replace("$level", String.valueOf(level))
-                            .replace("$xpProgress", formatNumber(xpProgress))
-                            .replace("$xpNeeded", formatNumber(xpNeeded))
-                            .replace("$progress", String.format("%.1f", progress)));
-        }
-    }
-
-    private String formatNumber(long number) {
-        if (number >= 1_000_000) {
-            return String.format("%.1fM", number / 1_000_000.0);
-        } else if (number >= 1_000) {
-            return String.format("%.1fK", number / 1_000.0);
-        }
-        return String.valueOf(number);
+        // 武器スキルはTrinityForgeへ一本化済み。
+        // PlayerData.getSkillXPは常に0を返すため、ここで表示するとレベル0が
+        // あたかも意味のあるデータであるかのように誤解を招く「偽の成功」になる。
+        // それを避けるため、EliteMobs側のスキルデータは使用されていない旨を通知する。
+        Logger.sendSimpleMessage(commandData.getCommandSender(),
+                "武器スキルはTrinityForgeへ一本化されているため、EliteMobsのスキルデータは使用されていません。");
     }
 }

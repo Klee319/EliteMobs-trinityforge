@@ -33,6 +33,11 @@ public class PotionCombatModifierCalculator {
     }
 
     public static double getIncomingDamageMultiplier(LivingEntity entity) {
+        // TrinityForge fork (spec section 1): vanilla Resistance is folded into TrinityForge's defense-rate %
+        // to avoid double mitigation. This is gated on combat DELEGATION (the toggle that makes TrinityForge's
+        // pipeline own mitigation), not gear neutralization, so the two concerns stay independently configurable.
+        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isCombatDelegationEnabled())
+            return 1.0;
         return Math.max(0, 1.0 - getEffectPercent(entity, PotionEffectType.RESISTANCE,
                 MobCombatSettingsConfig.getResistanceDamageMultiplier()));
     }
