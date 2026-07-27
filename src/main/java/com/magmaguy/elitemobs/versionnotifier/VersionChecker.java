@@ -74,7 +74,27 @@ public class VersionChecker {
 
     }
 
+    /**
+     * TrinityForge fork: 本家のバージョン確認を止める。
+     *
+     * このフォークは 10.3.0 で固定してあり、本家の最新版へ追従することはない
+     * （追従するとフォークの改変が全部消える）。そのため本家の版と比べると常に「古い」と判定され、
+     * 起動のたびに
+     *   Latest public release is 10.7.3 / Your version is 10.3.0
+     *   [EliteMobs] A newer version of this plugin is available for download!
+     * が出続けるうえ、pluginIsUpToDate = false のまま
+     * VersionCheckerEvents が管理者の参加時にも同じ案内を送っていた。
+     * どちらも対処のしようがない通知なので、確認そのものを行わない。
+     *
+     * serverVersionOlderThan（サーバ版の互換判定）と checkContentVersion
+     * （Nightbreak のコンテンツパック）はそのまま動く。
+     */
     private static void checkPluginVersion() {
+        // 何もしない。pluginIsUpToDate は初期値 true のままにしておく。
+    }
+
+    @SuppressWarnings("unused")
+    private static void checkPluginVersionUpstream() {
         new BukkitRunnable() {
             @Override
             public void run() {
