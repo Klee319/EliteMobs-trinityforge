@@ -20,9 +20,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -35,8 +32,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * handles and exposes the fork-side feature toggles loaded from {@code trinityforge.yml}.
  * <p>
  * All numeric balance lives in TrinityForge's own configuration (see the fork spec, section 9 — no
- * balance constants are baked into EliteMobs). The only values held here are boolean feature toggles and
- * the per-dungeon entry-gate level table, which are integration switches rather than balance numbers.
+ * balance constants are baked into EliteMobs). Dungeon entry rules live exclusively in TrinityForge's
+ * {@code dungeon/gates.yml}; EliteMobs has no duplicate gate switch or level table.
  * <p>
  * Every accessor is null/availability guarded: when TrinityForge is absent the fork behaves like vanilla
  * EliteMobs (no neutralization, no delegation) so the plugin still loads in a degraded mode.
@@ -45,11 +42,6 @@ public final class TrinityForgeIntegration {
 
     /** Identity multiplier used when short-circuiting gear-tier scaling (gear-independent combat). */
     public static final double NEUTRAL_GEAR_MULTIPLIER = 1.0;
-
-    /** Default dungeon entry-gate denial message. Uses legacy '&' color codes (converted through
-     * {@code ChatColorConverter}) and the {@code {required}}/{@code {current}} placeholders. */
-    public static final String DEFAULT_DUNGEON_GATE_MESSAGE =
-            "&cYou need combat level &e{required}&c to enter this dungeon (yours: &e{current}&c).";
 
     private static final String CONFIG_FILE = "trinityforge.yml";
     private static final String TRINITYFORGE_PLUGIN = "TrinityForge";
@@ -67,28 +59,11 @@ public final class TrinityForgeIntegration {
     private static boolean spawnProfileStamp = true;
     private static boolean hpDelegation = true;
     private static boolean lootStatStamp = true;
-    private static boolean dungeonEntryGate = false;
     private static boolean hateTargeting = true;
     private static boolean repairDisabled = true;
     private static boolean soulbindBridge = true;
     private static boolean useLevelRestriction = false;
     private static boolean suppressNativeCombatDisplay = true;
-
-    /**
-     * Dungeon content-package filename (its stable logical/blueprint name, e.g. {@code my_dungeon} for
-     * {@code content_packages/my_dungeon.yml}) -> required combat level for the entry gate. Empty = no gating.
-     * <p>
-     * Deliberately NOT keyed by world/instance name: instanced dungeons clone their blueprint world into a
-     * dynamically numbered instance ({@code WorldInstantiator.getNewWorldName}, e.g. {@code my_dungeon_3}), so a
-     * world-name key could never match across instances. The command/NPC-teleport fallback gate in
-     * {@code TrinityForgeDungeonGateListener#onPreTeleport} is the one exception: it only has a destination world
-     * name to key on, so dungeons reached exclusively through that path should also list their (static) world name
-     * here if they need gating.
-     */
-    private static Map<String, Integer> dungeonRequiredLevels = Collections.emptyMap();
-
-    /** Configurable denial message for the dungeon entry gate (see {@link #DEFAULT_DUNGEON_GATE_MESSAGE}). */
-    private static String dungeonGateMessage = DEFAULT_DUNGEON_GATE_MESSAGE;
 
     private TrinityForgeIntegration() {
     }
@@ -159,7 +134,6 @@ public final class TrinityForgeIntegration {
         spawnProfileStamp = yaml.getBoolean("spawn-profile-stamp", true);
         hpDelegation = yaml.getBoolean("hp-delegation", true);
         lootStatStamp = yaml.getBoolean("loot-stat-stamp", true);
-        dungeonEntryGate = yaml.getBoolean("dungeon-entry-gate.enabled", false);
         hateTargeting = yaml.getBoolean("hate-targeting", true);
         repairDisabled = yaml.getBoolean("repair-disabled", true);
         soulbindBridge = yaml.getBoolean("soulbind-bridge", true);
@@ -167,15 +141,6 @@ public final class TrinityForgeIntegration {
         // Missing key = suppression ON (default true) so an existing server's trinityforge.yml that
         // predates this toggle still gets the duplicate-display fix without an admin edit.
         suppressNativeCombatDisplay = yaml.getBoolean("suppress-native-combat-display", true);
-        dungeonGateMessage = yaml.getString("dungeon-entry-gate.message", DEFAULT_DUNGEON_GATE_MESSAGE);
-
-        Map<String, Integer> required = new HashMap<>();
-        if (yaml.isConfigurationSection("dungeon-entry-gate.required-combat-level")) {
-            for (String key : yaml.getConfigurationSection("dungeon-entry-gate.required-combat-level").getKeys(false)) {
-                required.put(key.toLowerCase(), yaml.getInt("dungeon-entry-gate.required-combat-level." + key, 0));
-            }
-        }
-        dungeonRequiredLevels = Collections.unmodifiableMap(required);
     }
 
     /** Marks the integration unavailable and drops any cached service references so a stale TrinityForge
@@ -231,6 +196,33 @@ public final class TrinityForgeIntegration {
             tf.dungeonWorldRegistry().unregister(worldId);
         } catch (RuntimeException | LinkageError e) {
             Logger.warn("TrinityForge dungeon-world unregistration failed for " + worldId + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Applies TrinityForge's death durability penalty ({@code combat/damage.yml durability.on-death}).
+     *
+     * <p>2026-07-30: instanced dungeons cancel the lethal damage in
+     * {@code MatchInstance.MatchInstanceEvents.onPlayerDamage} and route the player into the "downed"
+     * state, so {@code PlayerDeathEvent} never fires inside a dungeon and TrinityForge's own death
+     * penalty never ran. EliteMobs' own
+     * {@code com.magmaguy.elitemobs.collateralminecraftchanges.AlternativeDurabilityLoss} only touches
+     * EliteMobs-tagged items, so TrinityForge gear came out of a dungeon death untouched.
+     * Called from {@code InstancePlayerManager#playerDeath} <em>before</em> the player is moved to
+     * spectator mode (TrinityForge skips creative/spectator players).
+     *
+     * <p>No-op (never throws) when TrinityForge is unavailable, and the dungeon-only / game-mode
+     * gating lives on the TrinityForge side, so this call is unconditional by design.
+     */
+    public static void applyDeathDurabilityPenalty(org.bukkit.entity.Player player) {
+        if (!available || player == null) return;
+        try {
+            TrinityForge tf = TrinityForge.getInstance();
+            if (tf == null) return;
+            tf.applyDeathDurabilityPenalty(player);
+        } catch (RuntimeException | LinkageError e) {
+            Logger.warn("TrinityForge death durability penalty failed for "
+                    + player.getName() + ": " + e.getMessage());
         }
     }
 
@@ -385,10 +377,6 @@ public final class TrinityForgeIntegration {
         return available && lootStatStamp;
     }
 
-    public static boolean isDungeonEntryGateEnabled() {
-        return available && dungeonEntryGate;
-    }
-
     public static boolean isHateTargetingEnabled() {
         return available && hateTargeting;
     }
@@ -419,22 +407,4 @@ public final class TrinityForgeIntegration {
         return available && useLevelRestriction;
     }
 
-    /**
-     * @param dungeonName dungeon content-package filename (case-insensitive) for instanced dungeons, or the
-     *                    destination world name for the command/NPC-teleport fallback gate (see
-     *                    {@link #dungeonRequiredLevels})
-     * @return required combat level for entry, or 0 when the dungeon is not gated
-     */
-    public static int requiredCombatLevel(String dungeonName) {
-        if (dungeonName == null) return 0;
-        return dungeonRequiredLevels.getOrDefault(dungeonName.toLowerCase(), 0);
-    }
-
-    /**
-     * @return the configured dungeon entry-gate denial message (raw, with '&' color codes and the
-     * {@code {required}}/{@code {current}} placeholders still present). Never null.
-     */
-    public static String dungeonGateMessage() {
-        return dungeonGateMessage;
-    }
 }

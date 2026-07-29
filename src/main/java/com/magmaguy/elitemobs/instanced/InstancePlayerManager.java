@@ -112,6 +112,11 @@ public class InstancePlayerManager {
     public static void playerDeath(MatchInstance matchInstance, Player player) {
         if (!matchInstance.players.contains(player)) return;
         AlternativeDurabilityLoss.doDurabilityLoss(player);
+        // 2026-07-30: ダンジョン内の「死亡」はここに来る(致死ダメージは MatchInstanceEvents.onPlayerDamage が
+        // キャンセルするので PlayerDeathEvent は発火しない)。上の EliteMobs 側ペナルティは EliteMobs 製
+        // アイテムしか対象にしないため、TF 装備の耐久ペナルティは TF に明示的に依頼する。
+        // 下の addSpectator でスペクテイターになる前に呼ぶ必要がある(TF はスペクテイターを除外する)。
+        com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.applyDeathDurabilityPenalty(player);
         AttributeManager.setAttribute(player, "generic_max_health", AttributeManager.getAttributeBaseValue(player, "generic_max_health"));
         matchInstance.players.remove(player);
         if (matchInstance.players.isEmpty()) {

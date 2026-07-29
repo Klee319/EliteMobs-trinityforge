@@ -47,75 +47,43 @@ import org.bukkit.persistence.PersistentDataHolder;
  */
 public class TrinityForgeCombatListener implements Listener {
 
-    /**
-     * CMB-02 (課題3, 2026-07-25): opens the {@link EliteCombatDelegation} window for a player→elite
-     * melee/projectile hit BEFORE EliteMobs' own {@code onEliteMobAttacked} (registered at the default
-     * {@code NORMAL} priority on this same raw event) runs. Bukkit dispatches every priority tier for one
-     * event within a single synchronous {@code callEvent} call, so marking here at {@code LOWEST} (the
-     * very first tier) guarantees the mark is already active by the time {@code onEliteMobAttacked} fires
-     * its {@code EliteMobDamagedByPlayerEvent} (which this class's {@link #onEliteDamagedByPlayer} applies
-     * TrinityForge's full physical pipeline to) AND by the time TrinityForge's own {@code CombatListener}
-     * (registered at {@code HIGH} on this same raw event) gets its later turn — which is exactly the
-     * window that needs guarding, since that {@code HIGH} handler would otherwise re-derive the elite's
-     * defense/dodge/crit/penetration and re-apply the combat-level scale a second time (see
-     * {@link EliteCombatDelegation}'s javadoc). Paired with {@link #onEliteHitDelegationEnd} below;
-     * {@code ignoreCancelled} is deliberately left at its default {@code false} so the mark/clear pair
-     * stays symmetric even if a later handler (e.g. the anti-autoclicker throttle) cancels the event.
-     */
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onEliteHitDelegationBegin(EntityDamageByEntityEvent event) {
-        if (isDelegatedEliteHit(event)) {
-            EliteCombatDelegation.mark();
-        }
-    }
+    // ------------------------------------------------------------------------------------------
+    // CMB-02 (課題3, 2026-07-25) の二重適用ガードについて — 2026-07-28 に撤去した。
+    //
+    // 以前はこのクラスが LOWEST/MONITOR の対で EliteCombatDelegation.mark()/clear() を張り、
+    // 「player→elite はこの listener が値付け済み」と TF の CombatListener に伝えていた。
+    // 2026-07-28 に onEliteDamagedByPlayer が価格付けをやめ、EliteMobs の式の出力を素のバニラ
+    // ダメージへ戻すだけになったので、CombatListener が二重に適用する対象がそもそも無くなった。
+    //
+    // ★復活させないこと: マークが立っていると CombatListener は event.getDamage() をそのまま
+    //   最終ダメージとして採用する。今の onEliteDamagedByPlayer が入れている値は「素のバニラ
+    //   ダメージ」なので、マークを戻すと素手で1ダメージしか出なくなる。
+    // ------------------------------------------------------------------------------------------
 
     /**
-     * Clears the CMB-02 mark opened by {@link #onEliteHitDelegationBegin}. {@code MONITOR} guarantees
-     * this runs dead last among every registered listener for this one raw event — after EliteMobs' own
-     * {@code NORMAL} handler and after TrinityForge's {@code HIGH} handler have both already had their
-     * turn — so the marked window never leaks past this single event dispatch into an unrelated later hit.
+     * 2026-07-28「エリートをワンパンできる(素手で30万ダメージ)」の修正。
+     *
+     * <p>真因: player→elite のダメージだけ EliteMobs 自身の式が生き残っていた。EliteMobs は
+     * {@code baseDamage = 自分の指数HP式(2.1875×2^(Lv/5)) ÷ TARGET_HITS_TO_KILL_MOB(3)} を
+     * 「プレイヤーの1発ダメージ」に据えており(常に3発で倒せる設計)、Lv93 帯でちょうど 30万になる。
+     * ところが TF はエリートの<em>実</em>最大体力を自前のもっと平らな式で上書きしているため、
+     * EliteMobs が想定する HP と実 HP が桁違いに乖離し、素手でも一撃で溶けていた。
+     * この listener は従来その 30万に victim の防御を掛けるだけだったので、桁は落ちなかった。
+     *
+     * <p>方針(ユーザー決定 2026-07-28): <b>TF が player→elite も完全に引き取る</b>。ここでは
+     * EliteMobs の式の出力を捨て、素のバニラダメージへ戻すだけにする。実際の価格付け
+     * (attack-power 置換 / エンチャント / メイス / スイープ / チャージ減衰 / 会心 / 貫通 /
+     * エリートの防御・回避 / AoE / 出血 / 戦闘EXP)は、この直後に同じ生イベントの {@code HIGH} で
+     * 走る TF 自身の {@code CombatListener} が一手に行う。
+     *
+     * <p>この listener が価格付けをやめたので、CMB-02 の二重適用ガード
+     * ({@link EliteCombatDelegation}) も player→elite では張らない — 張ると CombatListener が
+     * 「fork が値付け済み」と判断して {@code event.getDamage()} をそのまま採用してしまい、
+     * バニラ素の値(素手なら1)が最終ダメージになってしまう。
+     *
+     * <p>生イベントを伴わない合成ダメージ(スキル由来など {@code EntityDamageByEntityEvent} が無い
+     * 経路)は CombatListener を通らないため、従来どおりこの場で FLAT パイプラインへ通す。
      */
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onEliteHitDelegationEnd(EntityDamageByEntityEvent event) {
-        if (isDelegatedEliteHit(event)) {
-            EliteCombatDelegation.clear();
-        }
-    }
-
-    /**
-     * True for exactly the player→elite hits that {@code EliteMobDamagedByPlayerEvent}'s
-     * {@code onEliteMobAttacked} will actually route through this class's {@link #onEliteDamagedByPlayer}
-     * (mirrors that method's own early-exit guards so the marked window matches its real processing
-     * window) — restricted to the 3 causes TrinityForge's own {@code CombatListener} also processes
-     * ({@code ENTITY_ATTACK}/{@code ENTITY_SWEEP_ATTACK}/player-shot {@code PROJECTILE}). A
-     * {@code THORNS}-cause hit here is 課題2's reflect-stat territory — TrinityForge's own
-     * {@code onVanillaThornsProc} already cancels it upstream at {@code LOWEST} on the SAME event type, so
-     * it never reaches {@code onEliteMobAttacked} either way; excluding it here just avoids a pointless mark.
-     */
-    private static boolean isDelegatedEliteHit(EntityDamageByEntityEvent event) {
-        EntityDamageEvent.DamageCause cause = event.getCause();
-        boolean relevantCause = cause == EntityDamageEvent.DamageCause.ENTITY_ATTACK
-                || cause == EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK
-                || cause == EntityDamageEvent.DamageCause.PROJECTILE;
-        if (!relevantCause) {
-            return false;
-        }
-        if (event.getEntity().getType() == EntityType.ENDER_DRAGON
-                && event.getEntity() instanceof EnderDragon dragon
-                && dragon.getPhase() == EnderDragon.Phase.DYING) {
-            return false;
-        }
-        if (cause == EntityDamageEvent.DamageCause.PROJECTILE && !(event.getDamager() instanceof Projectile)) {
-            return false;
-        }
-        LivingEntity livingEntity = EntityFinder.filterRangedDamagers(event.getDamager());
-        if (!(livingEntity instanceof Player)) {
-            return false;
-        }
-        EliteEntity eliteEntity = EntityTracker.getEliteMobEntity(event.getEntity());
-        return eliteEntity != null && eliteEntity.isValid();
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEliteDamagedByPlayer(EliteMobDamagedByPlayerEvent event) {
         if (!TrinityForgeIntegration.isCombatDelegationEnabled()) return;
@@ -124,6 +92,16 @@ public class TrinityForgeCombatListener implements Listener {
         Player player = event.getPlayer();
         PersistentDataHolder victim = livingEntityOf(event.getEliteMobEntity());
         if (player == null || victim == null) return;
+        EntityDamageByEntityEvent underlying = event.getEntityDamageByEntityEvent();
+        if (underlying != null) {
+            // EliteMobs はこの後 event.setDamage(BASE, ...) で書き戻すだけなので、この時点の生イベントは
+            // まだプレイヤーの素のバニラダメージを保持している。それを EliteMobs の式の出力と差し替える。
+            double vanillaBase = underlying.getDamage(EntityDamageEvent.DamageModifier.BASE);
+            if (Double.isFinite(vanillaBase) && vanillaBase > 0) {
+                event.setDamage(vanillaBase);
+                return;
+            }
+        }
         // #3: player's real TF attack stats (crit/penetration/bonus) fold into the elite-facing damage.
         applyPhysical(event::setDamage, victim, base, playerAttackStats(player));
     }
@@ -149,9 +127,14 @@ public class TrinityForgeCombatListener implements Listener {
         // (physicalFinalDamageFromMob at HIGH on the underlying EntityDamageByEntityEvent — i.e. AFTER
         // EliteMobs' NORMAL-priority damage filter fired this event). Applying the player's defense here too
         // would mitigate the same hit twice, so a stamped elite's melee is left for TrinityForge to own
-        // end-to-end. Melee only: TrinityForge's mob-attacker path ignores projectile/explosion causes, so
-        // those still need this listener's flat delegation even on a stamped elite.
-        if (isMeleeCause(event) && hasTrinityForgeAttackStamp(attacker)) return;
+        // end-to-end.
+        //
+        // 2026-07-30: PROJECTILE も同じ扱いに変わった。TrinityForge 側の resolveMobAttacker が
+        // 「飛び道具の発射者がモブなら、その一撃も TF が価格付けする」ようになったため
+        // (それまでモブの矢だけ TF スケールが乗っていなかった)、ここで先に価格付けすると
+        // 同じ一撃にプレイヤーの守備/回避が2回掛かる。爆発など TF が持たない cause は従来どおり
+        // この listener の flat 委譲が担う。
+        if (isTrinityForgeOwnedCause(event) && hasTrinityForgeAttackStamp(attacker)) return;
         // Mob attacker: its level scaling is already baked into the base by EliteMobs' LevelScaling, and it
         // carries no player offensive stats — so plain(0) and the player (victim) defense is what applies.
         applyPhysical(event::setDamage, player, base, AttackStats.plain(0));
@@ -186,12 +169,20 @@ public class TrinityForgeCombatListener implements Listener {
         }
     }
 
-    /** True when the underlying hit is a direct melee/sweep (the causes TrinityForge's mob path owns). */
-    private static boolean isMeleeCause(PlayerDamagedByEliteMobEvent event) {
+    /**
+     * True when the underlying hit's cause is one TrinityForge's own mob→player path owns
+     * ({@code CombatListener#resolveMobAttacker}): direct melee/sweep, or a projectile whose shooter is
+     * the mob. Keep this in sync with that method — a cause listed here MUST be handled there, or the
+     * hit loses its mitigation entirely instead of being mitigated twice.
+     */
+    private static boolean isTrinityForgeOwnedCause(PlayerDamagedByEliteMobEvent event) {
         org.bukkit.event.entity.EntityDamageByEntityEvent underlying = event.getEntityDamageByEntityEvent();
         if (underlying == null) return false;
         return switch (underlying.getCause()) {
             case ENTITY_ATTACK, ENTITY_SWEEP_ATTACK -> true;
+            case PROJECTILE -> underlying.getDamager() instanceof Projectile projectile
+                    && projectile.getShooter() instanceof LivingEntity shooter
+                    && !(shooter instanceof Player);
             default -> false;
         };
     }
