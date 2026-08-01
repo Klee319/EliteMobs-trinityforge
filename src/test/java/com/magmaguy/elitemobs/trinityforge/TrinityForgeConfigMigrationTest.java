@@ -159,6 +159,10 @@ class TrinityForgeConfigMigrationTest {
         assertTrue(blocks.containsKey("elite-drop-sources"), "shipped trinityforge.yml lost elite-drop-sources");
         assertTrue(blocks.containsKey("native-display-suppression"),
                 "shipped trinityforge.yml lost native-display-suppression");
+        assertTrue(blocks.containsKey("dungeon-entry-gate"),
+                "shipped trinityforge.yml lost the dungeon-entry-gate emergency-stop switch (HIGH-2)");
+        assertTrue(blocks.get("dungeon-entry-gate").endsWith("dungeon-entry-gate: true"),
+                "the shipped default must be true (= current delegated behaviour), not the old false default");
 
         String dropSources = blocks.get("elite-drop-sources");
         for (String key : new String[]{"random-loot:", "special-loot:", "elite-scroll:",
@@ -190,6 +194,29 @@ class TrinityForgeConfigMigrationTest {
         String result = Files.readString(file, StandardCharsets.UTF_8);
         assertTrue(result.contains("random-loot: false"), "the admin must be able to see and flip the new default");
         assertTrue(result.contains("nametag: true"));
+    }
+
+    @Test
+    @DisplayName("a server whose file predates dungeon-entry-gate gets it appended, defaulting to true")
+    void preUpgradeFileGainsDungeonEntryGate(@TempDir Path dir) throws IOException {
+        // HIGH-2: the old dungeon-entry-gate.enabled key (default false) was removed on 2026-08-01
+        // without a replacement, turning the gate from opt-in-off to always-on with no way to disable
+        // it. The new dungeon-entry-gate key (default true, matches the now-current delegated behaviour)
+        // must reach an already-existing server file the same way every other new section does.
+        String shipped = shippedResource();
+        LinkedHashMap<String, String> blocks = TrinityForgeConfigMigration.splitTopLevelBlocks(shipped);
+        Set<String> preUpgradeKeys = new java.util.LinkedHashSet<>(blocks.keySet());
+        preUpgradeKeys.remove("dungeon-entry-gate");
+
+        Path file = dir.resolve("trinityforge.yml");
+        Files.writeString(file, "gear-neutralization: true\n", StandardCharsets.UTF_8);
+
+        List<String> added = TrinityForgeConfigMigration.appendMissingKeys(file, preUpgradeKeys, shipped);
+
+        assertTrue(added.contains("dungeon-entry-gate"), "dungeon-entry-gate must be appended for a pre-upgrade file");
+        String result = Files.readString(file, StandardCharsets.UTF_8);
+        assertTrue(result.contains("dungeon-entry-gate: true"),
+                "the appended key must carry the new true default, not the old false default");
     }
 
     private static String shippedResource() throws IOException {

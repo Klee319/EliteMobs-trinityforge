@@ -32,8 +32,11 @@ import java.util.concurrent.ThreadLocalRandom;
  * handles and exposes the fork-side feature toggles loaded from {@code trinityforge.yml}.
  * <p>
  * All numeric balance lives in TrinityForge's own configuration (see the fork spec, section 9 — no
- * balance constants are baked into EliteMobs). Dungeon entry rules live exclusively in TrinityForge's
- * {@code dungeon/gates.yml}; EliteMobs has no duplicate gate switch or level table.
+ * balance constants are baked into EliteMobs). Dungeon entry rules (required level, keys, ...) live
+ * exclusively in TrinityForge's {@code dungeon/gates.yml}; EliteMobs has no duplicate level table.
+ * It does have one emergency-stop boolean ({@code dungeon-entry-gate}, default {@code true}) that can
+ * disable the gate lookup entirely without touching TrinityForge's own config — see
+ * {@link #isDungeonEntryGateEnabled()}.
  * <p>
  * Every accessor is null/availability guarded: when TrinityForge is absent the fork behaves like vanilla
  * EliteMobs (no neutralization, no delegation) so the plugin still loads in a degraded mode.
@@ -64,6 +67,10 @@ public final class TrinityForgeIntegration {
     private static boolean soulbindBridge = true;
     private static boolean useLevelRestriction = false;
     private static boolean suppressNativeCombatDisplay = true;
+
+    // Dungeon-entry-gate emergency stop (2026-08-01 restored). Default true (= current delegated
+    // behaviour, unchanged). See isDungeonEntryGateEnabled().
+    private static boolean dungeonEntryGate = true;
 
     // Granular display suppression (2026-08-01). Every key defaults to the
     // suppress-native-combat-display master switch except boss-tracking-bar, which has no TrinityForge
@@ -162,6 +169,10 @@ public final class TrinityForgeIntegration {
         repairDisabled = yaml.getBoolean("repair-disabled", true);
         soulbindBridge = yaml.getBoolean("soulbind-bridge", true);
         useLevelRestriction = yaml.getBoolean("use-level-restriction", false);
+        // Missing key = gate ON (default true, matches the pre-2026-08-01 delegated behaviour) so an
+        // upgrading server keeps working dungeon gates without an admin edit. This is the emergency-stop
+        // switch, not a balance value — false makes every dungeon in every world entry-unrestricted.
+        dungeonEntryGate = yaml.getBoolean("dungeon-entry-gate", true);
         // Missing key = suppression ON (default true) so an existing server's trinityforge.yml that
         // predates this toggle still gets the duplicate-display fix without an admin edit.
         suppressNativeCombatDisplay = yaml.getBoolean("suppress-native-combat-display", true);
@@ -572,6 +583,21 @@ public final class TrinityForgeIntegration {
      */
     public static boolean isUseLevelRestrictionEnabled() {
         return available && useLevelRestriction;
+    }
+
+    /**
+     * @return true when {@link TrinityForgeDungeonGateListener} should query TrinityForge's
+     * {@code DungeonGateService} ({@code dungeon/gates.yml}) at all. This is an emergency-stop switch,
+     * not a balance value: {@code dungeon-entry-gate.enabled} used to be the ONLY thing that read this
+     * flag and was removed as "dead" on 2026-08-01 because that removal made it look unreferenced — it
+     * was in fact the sole reference. Losing it turned the gate from "off by default, opt-in" into
+     * "always on, no way to turn off" for every server whose file predates this key. Default {@code true}
+     * so the currently-shipped delegated behaviour is unchanged; flipping this to {@code false} disables
+     * gate evaluation entirely and every dungeon becomes entry-unrestricted, so use it only to recover
+     * from a gate misconfiguration or a TrinityForge-side regression, not as a balance lever.
+     */
+    public static boolean isDungeonEntryGateEnabled() {
+        return available && dungeonEntryGate;
     }
 
 }

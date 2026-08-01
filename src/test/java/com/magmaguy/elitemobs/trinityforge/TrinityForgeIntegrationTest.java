@@ -33,7 +33,7 @@ class TrinityForgeIntegrationTest {
         for (String toggle : new String[]{
                 "gearNeutralization", "combatDelegation", "combatLevelMapping", "spawnProfileStamp",
                 "lootStatStamp", "hateTargeting", "repairDisabled",
-                "soulbindBridge", "useLevelRestriction"}) {
+                "soulbindBridge", "useLevelRestriction", "dungeonEntryGate"}) {
             setStaticBoolean(toggle, true);
         }
 
@@ -47,6 +47,8 @@ class TrinityForgeIntegrationTest {
         assertFalse(TrinityForgeIntegration.isRepairDisabled());
         assertFalse(TrinityForgeIntegration.isSoulbindBridgeEnabled());
         assertFalse(TrinityForgeIntegration.isUseLevelRestrictionEnabled());
+        assertFalse(TrinityForgeIntegration.isDungeonEntryGateEnabled(),
+                "the dungeon-entry-gate toggle must also be AND-ed with availability, not read standalone");
     }
 
     @Test
@@ -64,6 +66,11 @@ class TrinityForgeIntegrationTest {
         assertTrue(TrinityForgeIntegration.isHateTargetingEnabled());
         setStaticBoolean("hateTargeting", false);
         assertFalse(TrinityForgeIntegration.isHateTargetingEnabled());
+
+        setStaticBoolean("dungeonEntryGate", true);
+        assertTrue(TrinityForgeIntegration.isDungeonEntryGateEnabled());
+        setStaticBoolean("dungeonEntryGate", false);
+        assertFalse(TrinityForgeIntegration.isDungeonEntryGateEnabled());
     }
 
     @Test

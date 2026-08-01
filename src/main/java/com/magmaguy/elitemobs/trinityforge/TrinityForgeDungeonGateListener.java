@@ -57,6 +57,12 @@ public class TrinityForgeDungeonGateListener implements Listener {
         if (!TrinityForgeIntegration.isAvailable()) {
             return true;
         }
+        if (!TrinityForgeIntegration.isDungeonEntryGateEnabled()) {
+            // Emergency stop: trinityforge.yml `dungeon-entry-gate: false`. Skip the gate lookup entirely
+            // instead of treating it as an unreachable-service failure — this is an intentional admin
+            // choice, not a degraded state, so it must not log a warning like the fail-open paths below.
+            return true;
+        }
         if (player.hasPermission(ADMIN_PERMISSION) || player.hasPermission(TOOLING_PERMISSION)) {
             return true;
         }
@@ -86,6 +92,7 @@ public class TrinityForgeDungeonGateListener implements Listener {
      */
     private static boolean checkConfiguredTeleportAllowed(Player player, String lookupKey) {
         if (!TrinityForgeIntegration.isAvailable()
+                || !TrinityForgeIntegration.isDungeonEntryGateEnabled()
                 || player.hasPermission(ADMIN_PERMISSION)
                 || player.hasPermission(TOOLING_PERMISSION)) {
             return true;

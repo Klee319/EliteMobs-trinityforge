@@ -46,5 +46,6 @@ final class IntegrationState {
         set("available", false);
         setAll(DROP_TOGGLES, true);
         setAll(DISPLAY_TOGGLES, false);
+        set("dungeonEntryGate", true);
     }
 }

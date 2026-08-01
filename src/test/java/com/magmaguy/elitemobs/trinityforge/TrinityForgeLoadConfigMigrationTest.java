@@ -70,6 +70,10 @@ class TrinityForgeLoadConfigMigrationTest {
                 "a jar swap must not hide every nametag without the key appearing in the file");
         assertTrue(result.contains("random-loot:"));
         assertTrue(result.contains("nametag:"));
+        assertTrue(result.contains("dungeon-entry-gate: true"),
+                "HIGH-2: a pre-2026-08-01 file must gain the dungeon-entry-gate emergency-stop switch, "
+                        + "defaulting to true (the current delegated behaviour), not silently run the "
+                        + "code default with no key to change it by");
     }
 
     @Test
@@ -94,6 +98,7 @@ class TrinityForgeLoadConfigMigrationTest {
         // Poison the in-memory state so a value can only become correct by being read from the file.
         IntegrationState.set("allowRandomEliteLoot", true);
         IntegrationState.set("suppressBossTrackingBar", true);
+        IntegrationState.set("dungeonEntryGate", false);
 
         loadConfig(pluginFor(dataFolder));
 
@@ -102,6 +107,9 @@ class TrinityForgeLoadConfigMigrationTest {
                 "elite-drop-sources.random-loot ships as false and must be read back from the migrated file");
         assertFalse(TrinityForgeIntegration.isSuppressBossTrackingBarEnabled(),
                 "native-display-suppression.boss-tracking-bar ships as false and must be read back");
+        assertTrue(TrinityForgeIntegration.isDungeonEntryGateEnabled(),
+                "dungeon-entry-gate ships as true and must be read back from the migrated file, "
+                        + "not left at the poisoned false");
     }
 
     private static void loadConfig(Plugin plugin) throws Exception {
