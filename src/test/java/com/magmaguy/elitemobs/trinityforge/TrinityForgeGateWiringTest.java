@@ -26,9 +26,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The check reads the compiled class file and looks for the method name in its constant pool: a
  * {@code javac}-emitted method reference puts the callee's owner and name there, and deleting the call
  * removes them. It is deliberately dumb — no bytecode library, no reflection into private methods — so
- * it cannot rot on its own. Its one blind spot, stated plainly: a call whose RESULT is ignored
- * ({@code Policy.shouldX(); doItAnyway();}) still leaves the constant-pool entry, which is why the
- * behavioural tests above are the primary defence and this is the backstop.
+ * it cannot rot on its own.
+ * <p>
+ * <b>Its real blind spot (corrected 2026-08-01, HIGH-1)</b> is NOT "a call whose result is ignored" —
+ * an earlier version of this javadoc claimed that, but it is wrong. The constant pool is scanned once
+ * per CLASS FILE, not per method, so the check is "same-class, different-method" blind: if method A's
+ * gate is deleted but method B in the SAME class still calls the identical policy method, the class's
+ * constant pool still contains the reference and this test stays green even though A now bypasses the
+ * gate entirely. This was proven, not theorised: mutation-testing this fork on 2026-08-01 deleted the
+ * gate from {@code CurrencyCustomLootEntry#directDrop} only (leaving it in {@code #locationDrop}) and
+ * separately hard-coded the {@code bonus_coins.yml} argument in {@code LootTables#generatePlayerLoot}
+ * to {@code false} (leaving the {@code shouldRunCurrencyShower} call itself untouched) — both mutations
+ * left every test in this class green. Per-call-site coverage for those two spots now lives in
+ * {@link CurrencyShowerCallSiteTest}, which disassembles ({@code javap}) and slices out the ONE method's
+ * own bytecode via {@link Javap#sliceMethod}, because neither call site can be driven behaviourally
+ * without a live Bukkit server (a spawned elite, a player, and — for the direct-drop path — a working
+ * economy backend). The ignored-result case IS also a real gap of this class (nothing here proves a
+ * call's return value gates anything), but it was never the one mutation testing actually found.
  */
 class TrinityForgeGateWiringTest {
 

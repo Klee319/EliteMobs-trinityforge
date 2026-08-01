@@ -20,7 +20,7 @@ import com.magmaguy.elitemobs.mobconstructor.mobdata.aggressivemobs.EliteMobProp
 import com.magmaguy.elitemobs.playerdata.ElitePlayerInventory;
 import com.magmaguy.elitemobs.powers.meta.CustomSummonPower;
 import com.magmaguy.elitemobs.powers.meta.ElitePower;
-import com.magmaguy.elitemobs.thirdparty.custommodels.CustomModel;
+import com.magmaguy.elitemobs.thirdparty.custommodels.CustomModelInterface;
 import com.magmaguy.elitemobs.thirdparty.discordsrv.DiscordSRVAnnouncement;
 import com.magmaguy.elitemobs.thirdparty.libsdisguises.DisguiseEntity;
 import com.magmaguy.elitemobs.utils.CommandRunner;
@@ -85,9 +85,14 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
     @Getter
     @Setter
     private boolean isMount = false;
+    // TrinityForge (2026-08-01, HIGH-1): widened from the concrete CustomModel to its interface so unit
+    // tests can inject a recording test double via the existing Lombok setter — every external call site
+    // (grep-audited) only ever uses CustomModelInterface methods (melee/shoot/playAnimationByName/
+    // switchPhase/getNametagBoneLocation/addPassenger/setName/setNameVisible/setSyncMovement), so this is
+    // behavior-preserving.
     @Getter
     @Setter
-    private CustomModel customModel = null;
+    private CustomModelInterface customModel = null;
     @Getter
     private boolean normalizedCombat;
     private boolean scaledCombat;

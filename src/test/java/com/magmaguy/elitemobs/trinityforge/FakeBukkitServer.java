@@ -2,6 +2,7 @@ package com.magmaguy.elitemobs.trinityforge;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
+import org.bukkit.plugin.PluginManager;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
@@ -35,6 +36,7 @@ final class FakeBukkitServer {
         }
         Logger logger = Logger.getLogger("FakeBukkitServer");
         logger.setLevel(Level.OFF);
+        PluginManager pluginManager = noPluginsEnabledPluginManager();
         InvocationHandler handler = (proxy, method, args) -> {
             switch (method.getName()) {
                 case "getLogger":
@@ -44,6 +46,12 @@ final class FakeBukkitServer {
                 case "getVersion":
                 case "getBukkitVersion":
                     return "test";
+                case "getPluginManager":
+                    // Without this, Bukkit.getPluginManager() returns null (PluginManager isn't
+                    // primitive) and any production code that checks isPluginEnabled(...) — e.g.
+                    // CustomBossEntity#setNameVisible's LibsDisguises check — NPEs instead of taking the
+                    // "not installed" branch a bare test JVM actually is in.
+                    return pluginManager;
                 case "hashCode":
                     return System.identityHashCode(proxy);
                 case "equals":
@@ -57,6 +65,26 @@ final class FakeBukkitServer {
         Bukkit.setServer((Server) Proxy.newProxyInstance(
                 Server.class.getClassLoader(), new Class<?>[]{Server.class}, handler));
         installed = true;
+    }
+
+    /** A {@link PluginManager} that reports every plugin (LibsDisguises included) as not enabled. */
+    private static PluginManager noPluginsEnabledPluginManager() {
+        InvocationHandler handler = (proxy, method, args) -> {
+            switch (method.getName()) {
+                case "isPluginEnabled":
+                    return false;
+                case "hashCode":
+                    return System.identityHashCode(proxy);
+                case "equals":
+                    return proxy == args[0];
+                case "toString":
+                    return "FakeBukkitServer.PluginManager";
+                default:
+                    return defaultValue(method.getReturnType());
+            }
+        };
+        return (PluginManager) Proxy.newProxyInstance(
+                PluginManager.class.getClassLoader(), new Class<?>[]{PluginManager.class}, handler);
     }
 
     private static Object defaultValue(Class<?> type) {
