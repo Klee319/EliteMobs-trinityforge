@@ -71,3 +71,62 @@ dungeon-entry-gate:
   # Message sent to a player who is denied dungeon entry by the gate. Supports legacy '&' color codes
   # (converted through EliteMobs' standard ChatColorConverter) and the {required}/{current} placeholders.
   message: "&cYou need combat level &e{required}&c to enter this dungeon (yours: &e{current}&c)."
+
+# ---------------------------------------------------------------------------
+# EliteMobs 側の頭上表示・バーの個別抑制 (2026-08-01)
+# ---------------------------------------------------------------------------
+# suppress-native-combat-display は「まとめて抑制する」マスタースイッチです。
+# ここに書いたキーだけがマスターを上書きし、書かなかったキーはマスターの値をそのまま使います
+# (＝この節を丸ごと消しても従来どおり動きます)。TrinityForge 未導入時はすべて無効
+# (EliteMobs は単体プラグインとして自前の表示を保ちます)。
+native-display-suppression:
+  # バニラの頭上名 (customNameVisible)。カスタムボスの alwaysShowName / 戦闘突入時の再表示 /
+  # LibsDisguises 側の名札もまとめてこのキーで抑制します。
+  # TrinityForge の FocusHp 表示が名前とレベルを出しているため、既定はマスター (=true) 追従。
+  nametag: true
+  # FreeMinecraftModels / ModelEngine のモデルが nametag ボーン位置に描く名札。
+  # TrinityForge の頭上表示とちょうど同じ高さに出るため、既定はマスター (=true) 追従。
+  custom-model-nametag: true
+  # ボス位置追跡バー ("$name: $distance blocks away!")。距離と方角を出すもので
+  # TrinityForge に相当機能が無い＝重複表示ではないため、既定では抑制しません (false)。
+  # ボスバーの表示枠を TrinityForge 側に明け渡したい場合だけ true にしてください。
+  boss-tracking-bar: false
+
+# ---------------------------------------------------------------------------
+# EliteMobs 独自ドロップ経路の許可 (2026-08-01)
+# ---------------------------------------------------------------------------
+# TrinityForge が設定するモブドロップは combat/mob-overrides.yml の drops: と
+# combat/mob-level-table.yml の add-drops: の2つだけで、どちらも EntityDeathEvent へ
+# 後段 (HIGH / MONITOR) から追加されます。一方 EliteMobs 自身は「エリート戦利品」を
+# EntityDeathEvent を通さずプレイヤーへ直接渡す経路を複数持っており、そちらは
+# TrinityForge の設定を一切経由しません。「設定していないアイテムが落ちる」の実体はこれです。
+# ここではその経路を1つずつ止められます。どれを止めたかは起動時にログへ1行出ます。
+#
+# 既定を「止める」にした理由:
+#   ランダム生成品・特殊枠・スクロール・バニラ増殖は、アイテムのステータス/品質/入手経路を
+#   TrinityForge が一元管理する構成では「設定していないのに落ちるアイテム」そのものになるため。
+# 既定を「残す」にした理由:
+#   uniqueLootList はそのボスのために書かれた意図的なコンテンツで、通貨はギルド機能の前提のため。
+#   これらまで黙って消すと別のバグ報告になります。
+#
+# TrinityForge 未導入時はすべてのキーが無視され、素の EliteMobs と同じ挙動になります。
+elite-drop-sources:
+  # ランダムエリート戦利品プール (procedural / weighed / fixed / limited / scalable)。
+  # ItemSettings.yml の各 weight で選ばれる EliteMobs 独自のアイテム生成。
+  random-loot: false
+  # SpecialItemSystems.yml の特殊アイテム追加ドロップ。
+  special-loot: false
+  # エリートスクロール (ItemSettings.yml の useEliteItemScrolls)。
+  elite-scroll: false
+  # バニラドロップの増殖 (ItemSettings.yml の defaultLootMultiplier)。
+  # レベル×0.1×倍率 回だけ同じスタックを追加で地面へ落とす処理で、dropsVanillaLoot: true の
+  # モブだけが対象です。バニラドロップ「そのもの」は下の vanilla-loot 側で制御します。
+  vanilla-loot-multiplier: false
+  # dropsVanillaLoot: true のモブが落とすバニラドロップそのもの。
+  # false にすると dropsVanillaLoot: false のモブと同じく EntityDeathEvent の drops を空にします
+  # (TrinityForge 側の追加ドロップは後段で足されるので影響を受けません)。
+  vanilla-loot: true
+  # ギルド通貨 (EliteCoin) のドロップシャワー。
+  currency-shower: true
+  # custombosses/*.yml の uniqueLootList (そのボス専用に書かれたドロップ)。
+  boss-unique-loot: true

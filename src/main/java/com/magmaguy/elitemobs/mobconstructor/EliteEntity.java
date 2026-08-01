@@ -369,6 +369,14 @@ public class EliteEntity {
     public void setNameVisible(boolean isVisible) {
         //Check if the boss is already dead
         if (livingEntity == null) return;
+        // TrinityForge integration (2026-08-01): EliteMobEnterCombatEvent turns the vanilla nametag ON for
+        // every elite that enters combat, which re-showed the nametag that setName() had just hidden.
+        // Suppression can only ever hide, never force-show, so "false" still goes through unchanged.
+        if (isVisible
+                && com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNametagEnabled()) {
+            livingEntity.setCustomNameVisible(false);
+            return;
+        }
         livingEntity.setCustomNameVisible(isVisible);
     }
 

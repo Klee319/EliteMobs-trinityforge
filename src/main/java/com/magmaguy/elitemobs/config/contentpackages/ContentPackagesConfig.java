@@ -34,6 +34,27 @@ public class ContentPackagesConfig extends CustomConfig {
     }
 
     /**
+     * Looks a content package up by its config filename across BOTH indexes.
+     * <p>
+     * The constructor deliberately splits {@code isEnchantmentChallenge()} packages out of
+     * {@link #getDungeonPackages()} (they must not appear in the normal dungeon teleport lists), which
+     * means {@code getDungeonPackages().get(filename)} returns {@code null} for every
+     * {@code enchantment_challenge_*_sanctum.yml}. Any code that resolves a package the player is
+     * actually trying to ENTER must use this method instead: an enchantment-challenge sanctum is a
+     * perfectly ordinary instanced dungeon once it is being entered, and
+     * {@code DungeonInstance#initializeInstancedWorld} already branches on
+     * {@code isEnchantmentChallenge()} to build the right instance type.
+     *
+     * @param filename the content-package config filename, always with the {@code .yml} suffix
+     * @return the fields, or {@code null} when no package with that filename exists
+     */
+    public static ContentPackagesConfigFields getAnyPackage(String filename) {
+        if (filename == null) return null;
+        ContentPackagesConfigFields fields = dungeonPackages.get(filename);
+        return fields != null ? fields : enchantedChallengeDungeonPackages.get(filename);
+    }
+
+    /**
      * Re-reads dungeonVersion from disk for all content packages.
      * Must be called after the importer extracts new content (which overwrites YAML files)
      * but before initializePackages() and VersionChecker.check().

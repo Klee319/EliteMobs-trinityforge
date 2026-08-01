@@ -19,6 +19,11 @@ public class CustomBossDeath implements Listener {
 
     private static void doLoot(CustomBossEntity customBossEntity) {
         if (customBossEntity.isTriggeredAntiExploit()) return;
+        // TrinityForge (2026-08-01): uniqueLootList is loot AUTHORED for this specific boss, not a random
+        // pool, so elite-drop-sources.boss-unique-loot defaults to allowed — blocking it would silently
+        // delete intended EliteMobs content. The switch exists for servers that want TrinityForge's
+        // combat/mob-overrides.yml drops: to be the only drop table.
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isBossUniqueLootAllowed()) return;
         if (customBossEntity.customBossesConfigFields.getUniqueLootList() == null ||
                 customBossEntity.customBossesConfigFields.getUniqueLootList().isEmpty()) return;
 

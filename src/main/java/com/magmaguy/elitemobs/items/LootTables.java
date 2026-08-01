@@ -13,6 +13,7 @@ import com.magmaguy.elitemobs.mobconstructor.EliteEntity;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.CustomBossEntity;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.RegionalBossEntity;
 import com.magmaguy.elitemobs.playerdata.database.PlayerData;
+import com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration;
 import com.magmaguy.elitemobs.trinityforge.TrinityForgeLootListener;
 import com.magmaguy.elitemobs.utils.WeightedProbability;
 import com.magmaguy.magmacore.util.Logger;
@@ -66,7 +67,10 @@ public class LootTables implements Listener {
             double itemLevel = setItemTier(rewardLevel);
             double eliteLevel = rewardLevel;
 
-            if (eliteEntity.getPower("bonus_coins.yml") == null)
+            // TrinityForge (2026-08-01): EliteMobs' guild-currency shower is an EliteMobs-owned drop
+            // source, gated by elite-drop-sources.currency-shower (default: allowed).
+            if (eliteEntity.getPower("bonus_coins.yml") == null
+                    && TrinityForgeIntegration.isCurrencyShowerAllowed())
                 new ItemLootShower(itemLevel, eliteLevel, eliteEntity.getUnsyncedLivingEntity().getLocation(), player);
 
             if (!(eliteEntity.isRandomLoot())) continue;
@@ -77,9 +81,14 @@ public class LootTables implements Listener {
             TrinityForgeLootListener.beginDropContext(rewardLevel, player);
             try {
                 // Skill-based gear restriction now handles equipping, not drops
-                generateLoot(eliteEntity, player);
+                // TrinityForge (2026-08-01): this is EliteMobs' OWN random item pool — nothing here is
+                // described by any TrinityForge config, so it is the main source of "items I never
+                // configured are dropping". Gated by elite-drop-sources.random-loot (default: blocked).
+                if (TrinityForgeIntegration.isRandomEliteLootAllowed())
+                    generateLoot(eliteEntity, player);
 
-                if (SpecialItemSystemsConfig.isDropSpecialLoot()) {
+                if (SpecialItemSystemsConfig.isDropSpecialLoot()
+                        && TrinityForgeIntegration.isSpecialLootAllowed()) {
                     if (eliteEntity instanceof CustomBossEntity customBossEntity &&
                             customBossEntity.getCustomBossesConfigFields().getHealthMultiplier() > 1.0 &&
                             ThreadLocalRandom.current().nextDouble() < SpecialItemSystemsConfig.getBossChanceToDrop())
@@ -92,7 +101,10 @@ public class LootTables implements Listener {
                 TrinityForgeLootListener.endDropContext();
             }
 
+            // TrinityForge (2026-08-01): elite scrolls are an EliteMobs item system with no TrinityForge
+            // counterpart — gated by elite-drop-sources.elite-scroll (default: blocked).
             if (ItemSettingsConfig.isUseEliteItemScrolls() &&
+                    TrinityForgeIntegration.isEliteScrollAllowed() &&
                     ThreadLocalRandom.current().nextDouble() < ItemSettingsConfig.getEliteItemScrollChance()) {
                 ItemStack scrollItem = EliteScroll.generateScroll((int) itemLevel, player);
                 if (ItemSettingsConfig.isPutLootDirectlyIntoPlayerInventory()) {
@@ -424,7 +436,14 @@ public class LootTables implements Listener {
 
     @EventHandler
     public void onDeath(EliteMobDeathEvent event) {
-        if (event.getEntityDeathEvent() != null && !event.getEliteEntity().isVanillaLoot())
+        // TrinityForge (2026-08-01): upstream only clears the vanilla drop list for mobs configured with
+        // dropsVanillaLoot: false. elite-drop-sources.vanilla-loot: false extends that clear to EVERY
+        // elite, so a mob that TrinityForge has no drop table for drops nothing rather than its vanilla
+        // loot. TrinityForge's own additions are untouched: MobLevelTableListener (HIGH) and
+        // MobOverrideDropListener (MONITOR) both write to the same EntityDeathEvent strictly AFTER this
+        // NORMAL-priority handler, so they are appended to the emptied list, not cleared by it.
+        if (event.getEntityDeathEvent() != null
+                && (!event.getEliteEntity().isVanillaLoot() || !TrinityForgeIntegration.isVanillaLootAllowed()))
             event.getEntityDeathEvent().getDrops().clear();
         if (!event.getEliteEntity().isEliteLoot()) return;
         if (event.getEliteEntity().getLevel() < 1) return;

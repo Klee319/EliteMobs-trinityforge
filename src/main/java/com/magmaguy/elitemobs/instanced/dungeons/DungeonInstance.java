@@ -93,7 +93,15 @@ public class DungeonInstance extends MatchInstance {
     }
 
     public static void setupInstancedDungeon(Player player, String instancedDungeonConfigFieldsString, String difficultyName) {
-        ContentPackagesConfigFields instancedDungeonsConfigFields = ContentPackagesConfig.getDungeonPackages().get(instancedDungeonConfigFieldsString);
+        // getDungeonPackages() excludes every isEnchantmentChallenge() package by design (they must not
+        // show up in the normal teleport lists), so looking the entered dungeon up there made EVERY
+        // enchantment_challenge_*_sanctum unenterable: the browser opens (it uses EMPackage.getEmPackages())
+        // but clicking a difficulty reported "Failed to get data for dungeon ...! The dungeon will not
+        // start." — reported from the live server as「エンチャント試練1~10が存在しない」(2026-08-01).
+        // getAnyPackage() covers both indexes; initializeInstancedWorld() below already builds an
+        // EnchantmentDungeonInstance for these, so the rest of the path was always correct.
+        ContentPackagesConfigFields instancedDungeonsConfigFields =
+                ContentPackagesConfig.getAnyPackage(instancedDungeonConfigFieldsString);
         if (instancedDungeonsConfigFields == null) {
             player.sendMessage(DungeonsConfig.getDungeonDataFailedMessage().replace("$dungeon", instancedDungeonConfigFieldsString));
             return;

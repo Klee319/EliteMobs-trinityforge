@@ -65,6 +65,24 @@ public final class TrinityForgeIntegration {
     private static boolean useLevelRestriction = false;
     private static boolean suppressNativeCombatDisplay = true;
 
+    // Granular display suppression (2026-08-01). Every key defaults to the
+    // suppress-native-combat-display master switch except boss-tracking-bar, which has no TrinityForge
+    // counterpart and therefore defaults to "not suppressed" — see trinityforge.yml.
+    private static boolean suppressNametag = true;
+    private static boolean suppressCustomModelNametag = true;
+    private static boolean suppressBossTrackingBar = false;
+
+    // EliteMobs-originated drop sources (2026-08-01). These are the loot paths EliteMobs hands to the
+    // player WITHOUT going through TrinityForge's configuration, so they are the ones that show up as
+    // "items I never configured are dropping". Defaults documented in trinityforge.yml.
+    private static boolean allowRandomEliteLoot = false;
+    private static boolean allowSpecialLoot = false;
+    private static boolean allowEliteScroll = false;
+    private static boolean allowVanillaLootMultiplier = false;
+    private static boolean allowVanillaLoot = true;
+    private static boolean allowCurrencyShower = true;
+    private static boolean allowBossUniqueLoot = true;
+
     private TrinityForgeIntegration() {
     }
 
@@ -141,6 +159,46 @@ public final class TrinityForgeIntegration {
         // Missing key = suppression ON (default true) so an existing server's trinityforge.yml that
         // predates this toggle still gets the duplicate-display fix without an admin edit.
         suppressNativeCombatDisplay = yaml.getBoolean("suppress-native-combat-display", true);
+        // Granular overrides: a missing key inherits the master switch, so an existing server's file that
+        // predates this section behaves exactly as the master says (and gets the nametag fix for free).
+        suppressNametag = yaml.getBoolean("native-display-suppression.nametag", suppressNativeCombatDisplay);
+        suppressCustomModelNametag = yaml.getBoolean("native-display-suppression.custom-model-nametag",
+                suppressNativeCombatDisplay);
+        // No TrinityForge counterpart (it shows distance/direction, not HP) — never suppressed unless asked.
+        suppressBossTrackingBar = yaml.getBoolean("native-display-suppression.boss-tracking-bar", false);
+
+        allowRandomEliteLoot = yaml.getBoolean("elite-drop-sources.random-loot", false);
+        allowSpecialLoot = yaml.getBoolean("elite-drop-sources.special-loot", false);
+        allowEliteScroll = yaml.getBoolean("elite-drop-sources.elite-scroll", false);
+        allowVanillaLootMultiplier = yaml.getBoolean("elite-drop-sources.vanilla-loot-multiplier", false);
+        allowVanillaLoot = yaml.getBoolean("elite-drop-sources.vanilla-loot", true);
+        allowCurrencyShower = yaml.getBoolean("elite-drop-sources.currency-shower", true);
+        allowBossUniqueLoot = yaml.getBoolean("elite-drop-sources.boss-unique-loot", true);
+        logSuppressedDropSources();
+    }
+
+    /**
+     * Logs, once at startup, exactly which EliteMobs-originated drop sources are currently blocked.
+     * Silently deleting loot is the failure mode this feature is most likely to be blamed for, so the
+     * blocked set is always announced (fork spec 2026-08-01 "無言で全部消すのは避ける").
+     */
+    private static void logSuppressedDropSources() {
+        if (!available) return;
+        java.util.List<String> blocked = new java.util.ArrayList<>();
+        if (!allowRandomEliteLoot) blocked.add("random-loot (procedural/weighed/fixed/limited/scalable)");
+        if (!allowSpecialLoot) blocked.add("special-loot");
+        if (!allowEliteScroll) blocked.add("elite-scroll");
+        if (!allowVanillaLootMultiplier) blocked.add("vanilla-loot-multiplier");
+        if (!allowVanillaLoot) blocked.add("vanilla-loot");
+        if (!allowCurrencyShower) blocked.add("currency-shower");
+        if (!allowBossUniqueLoot) blocked.add("boss-unique-loot");
+        if (blocked.isEmpty()) {
+            Logger.info("TrinityForge: every EliteMobs drop source is enabled (elite-drop-sources).");
+            return;
+        }
+        Logger.info("TrinityForge: EliteMobs-originated drop sources blocked by elite-drop-sources in "
+                + CONFIG_FILE + ": " + String.join(", ", blocked)
+                + ". TrinityForge's own combat/mob-overrides.yml drops are unaffected.");
     }
 
     /** Marks the integration unavailable and drops any cached service references so a stale TrinityForge
@@ -256,6 +314,78 @@ public final class TrinityForgeIntegration {
      */
     public static boolean isSuppressNativeCombatDisplayEnabled() {
         return available && suppressNativeCombatDisplay;
+    }
+
+    /**
+     * @return true when EliteMobs' vanilla overhead nametag (the {@code customNameVisible} flag on the
+     * mob itself, including the {@code alwaysShowName} custom-boss override and the LibsDisguises mirror)
+     * should stay hidden because TrinityForge's FocusHp display already shows name + level. Gated on
+     * {@link #available}: with TrinityForge absent EliteMobs keeps its own nametags.
+     */
+    public static boolean isSuppressNametagEnabled() {
+        return available && suppressNametag;
+    }
+
+    /**
+     * @return true when the nametag rendered by a custom model (FreeMinecraftModels / ModelEngine
+     * nametag bone) should stay hidden. Separate from {@link #isSuppressNametagEnabled()} because a
+     * modeled boss' nametag is drawn by the model plugin at a different height and is the one most
+     * likely to visually collide with TrinityForge's own overhead display.
+     */
+    public static boolean isSuppressCustomModelNametagEnabled() {
+        return available && suppressCustomModelNametag;
+    }
+
+    /**
+     * @return true when EliteMobs' boss tracking boss-bar ("$name: $distance blocks away!") should not be
+     * created. Defaults to false — it shows distance/direction, which TrinityForge has no equivalent for,
+     * so it is NOT a duplicate display; it only competes for boss-bar screen space.
+     */
+    public static boolean isSuppressBossTrackingBarEnabled() {
+        return available && suppressBossTrackingBar;
+    }
+
+    /**
+     * Whether an EliteMobs-originated drop source may run. Every one of these fails OPEN when
+     * TrinityForge is absent: a standalone EliteMobs install must behave exactly like upstream.
+     */
+    private static boolean dropSourceAllowed(boolean flag) {
+        return !available || flag;
+    }
+
+    /** EliteMobs' random elite loot pool (procedural / weighed / fixed / limited / scalable). */
+    public static boolean isRandomEliteLootAllowed() {
+        return dropSourceAllowed(allowRandomEliteLoot);
+    }
+
+    /** EliteMobs' SpecialItemSystems bonus drop. */
+    public static boolean isSpecialLootAllowed() {
+        return dropSourceAllowed(allowSpecialLoot);
+    }
+
+    /** EliteMobs' elite item scroll drop ({@code ItemSettings.yml useEliteItemScrolls}). */
+    public static boolean isEliteScrollAllowed() {
+        return dropSourceAllowed(allowEliteScroll);
+    }
+
+    /** EliteMobs' vanilla-drop duplication ({@code ItemSettings.yml defaultLootMultiplier}). */
+    public static boolean isVanillaLootMultiplierAllowed() {
+        return dropSourceAllowed(allowVanillaLootMultiplier);
+    }
+
+    /** The vanilla death drops themselves, for mobs configured with {@code dropsVanillaLoot: true}. */
+    public static boolean isVanillaLootAllowed() {
+        return dropSourceAllowed(allowVanillaLoot);
+    }
+
+    /** EliteMobs' guild-currency ({@code EliteCoin}) loot shower. */
+    public static boolean isCurrencyShowerAllowed() {
+        return dropSourceAllowed(allowCurrencyShower);
+    }
+
+    /** A custom boss' own authored {@code uniqueLootList} (custombosses/*.yml). */
+    public static boolean isBossUniqueLootAllowed() {
+        return dropSourceAllowed(allowBossUniqueLoot);
     }
 
     public static SymmetricCombatService combatService() {

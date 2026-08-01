@@ -54,7 +54,12 @@ public class CustomBossMegaConsumer {
         String parsedName = ChatColorConverter.convert(MobLevelPlaceholderFormatter.replaceLevelPlaceholders(
                 customBossEntity.customBossesConfigFields.getName(), customBossEntity, level));
         livingEntity.setCustomName(parsedName);
-        boolean showName = DefaultConfig.isAlwaysShowNametags() || customBossEntity.customBossesConfigFields.isAlwaysShowName();
+        // TrinityForge integration (2026-08-01): this is the CUSTOM BOSS spawn path — EliteEntity#setName
+        // was already suppressed but this one was not, so every custom boss (dungeon bosses included)
+        // still spawned with its vanilla nametag on top of TrinityForge's FocusHp display. The name
+        // string itself is still set; only visibility is suppressed.
+        boolean showName = !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNametagEnabled()
+                && (DefaultConfig.isAlwaysShowNametags() || customBossEntity.customBossesConfigFields.isAlwaysShowName());
         livingEntity.setCustomNameVisible(showName);
         if (Bukkit.getPluginManager().isPluginEnabled("LibsDisguises"))
             DisguiseEntity.setDisguiseNameVisibility(showName, livingEntity, parsedName);

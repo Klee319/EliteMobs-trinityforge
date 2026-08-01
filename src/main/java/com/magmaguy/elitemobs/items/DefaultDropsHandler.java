@@ -41,7 +41,13 @@ public class DefaultDropsHandler implements Listener {
 
         inventoryItemsConstructor((LivingEntity) event.getEntity());
 
-        if (ItemSettingsConfig.getDefaultLootMultiplier() != 0) {
+        // TrinityForge (2026-08-01): defaultLootMultiplier re-drops each vanilla stack
+        // (level * 0.1 * multiplier) extra times. That duplication is pure EliteMobs balance with no
+        // TrinityForge counterpart, so it is gated by elite-drop-sources.vanilla-loot-multiplier
+        // (default: blocked). The vanilla drops themselves are governed separately by
+        // elite-drop-sources.vanilla-loot in LootTables#onDeath.
+        if (ItemSettingsConfig.getDefaultLootMultiplier() != 0
+                && TrinityForgeIntegration.isVanillaLootMultiplierAllowed()) {
             for (ItemStack itemStack : droppedItems) {
 
                 if (itemStack == null) continue;
