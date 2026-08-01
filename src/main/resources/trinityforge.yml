@@ -54,23 +54,8 @@ suppress-native-combat-display: true
 # fails open (allows use) on any error or missing requirement.
 use-level-restriction: false
 
-# Block dungeon entry below a required combat level. Spec section 6.
-# The required levels are an integration table (which dungeon needs which level), keyed by the dungeon's
-# content-package filename (its stable logical/blueprint name — e.g. "my_dungeon" for
-# content_packages/my_dungeon.yml, NOT the dynamically numbered instance world it clones into, like
-# my_dungeon_3). This gate is checked directly when a player creates or joins an instanced dungeon, so it
-# always applies regardless of the teleport-timer setting below.
-# For dungeons only ever reached through a plain teleport (command/NPC, no dungeon instance), the fallback
-# gate below matches on the destination world name instead — list that world's name here if it needs gating.
-# Leave empty (or enabled: false) to disable gating entirely.
-dungeon-entry-gate:
-  enabled: false
-  required-combat-level: {}
-    # my_dungeon: 20
-    # example_dungeon_world: 20
-  # Message sent to a player who is denied dungeon entry by the gate. Supports legacy '&' color codes
-  # (converted through EliteMobs' standard ChatColorConverter) and the {required}/{current} placeholders.
-  message: "&cYou need combat level &e{required}&c to enter this dungeon (yours: &e{current}&c)."
+# ダンジョン入場条件は TrinityForge/dungeon/gates.yml が唯一の設定元です。
+# EliteMobs側に重複した有効スイッチや必要レベル表はありません。
 
 # ---------------------------------------------------------------------------
 # EliteMobs 側の頭上表示・バーの個別抑制 (2026-08-01)

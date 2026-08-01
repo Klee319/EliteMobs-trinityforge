@@ -8,7 +8,6 @@ import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -33,7 +32,7 @@ class TrinityForgeIntegrationTest {
         // Turn the underlying toggles ON to prove they are gated purely by availability.
         for (String toggle : new String[]{
                 "gearNeutralization", "combatDelegation", "combatLevelMapping", "spawnProfileStamp",
-                "lootStatStamp", "dungeonEntryGate", "hateTargeting", "repairDisabled",
+                "lootStatStamp", "hateTargeting", "repairDisabled",
                 "soulbindBridge", "useLevelRestriction"}) {
             setStaticBoolean(toggle, true);
         }
@@ -44,7 +43,6 @@ class TrinityForgeIntegrationTest {
         assertFalse(TrinityForgeIntegration.isCombatLevelMappingEnabled());
         assertFalse(TrinityForgeIntegration.isSpawnProfileStampEnabled());
         assertFalse(TrinityForgeIntegration.isLootStatStampEnabled());
-        assertFalse(TrinityForgeIntegration.isDungeonEntryGateEnabled());
         assertFalse(TrinityForgeIntegration.isHateTargetingEnabled());
         assertFalse(TrinityForgeIntegration.isRepairDisabled());
         assertFalse(TrinityForgeIntegration.isSoulbindBridgeEnabled());
@@ -66,23 +64,6 @@ class TrinityForgeIntegrationTest {
         assertTrue(TrinityForgeIntegration.isHateTargetingEnabled());
         setStaticBoolean("hateTargeting", false);
         assertFalse(TrinityForgeIntegration.isHateTargetingEnabled());
-    }
-
-    @Test
-    @DisplayName("requiredCombatLevel returns 0 for null and ungated dungeons")
-    void requiredCombatLevel_zeroForNullAndUnknown() {
-        assertEquals(0, TrinityForgeIntegration.requiredCombatLevel(null));
-        assertEquals(0, TrinityForgeIntegration.requiredCombatLevel("never_configured_world"));
-    }
-
-    @Test
-    @DisplayName("default gate message is present and carries both placeholders")
-    void dungeonGateMessage_defaultHasPlaceholders() {
-        String message = TrinityForgeIntegration.dungeonGateMessage();
-        assertNotNull(message);
-        assertTrue(message.contains("{required}"), "default message should expose {required}");
-        assertTrue(message.contains("{current}"), "default message should expose {current}");
-        assertEquals(TrinityForgeIntegration.DEFAULT_DUNGEON_GATE_MESSAGE, message);
     }
 
     @Test

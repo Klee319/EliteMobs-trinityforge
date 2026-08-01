@@ -372,12 +372,8 @@ public class EliteEntity {
         // TrinityForge integration (2026-08-01): EliteMobEnterCombatEvent turns the vanilla nametag ON for
         // every elite that enters combat, which re-showed the nametag that setName() had just hidden.
         // Suppression can only ever hide, never force-show, so "false" still goes through unchanged.
-        if (isVisible
-                && com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNametagEnabled()) {
-            livingEntity.setCustomNameVisible(false);
-            return;
-        }
-        livingEntity.setCustomNameVisible(isVisible);
+        livingEntity.setCustomNameVisible(
+                com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.resolveNametagVisible(isVisible));
     }
 
     public void setMaxHealth() {
@@ -633,11 +629,14 @@ public class EliteEntity {
         livingEntity.setCustomName(this.name);
         // TrinityForge integration (fork spec item 3): when TrinityForge's own FocusHp display is
         // showing name/level, hide EliteMobs' vanilla nametag too so the two don't duplicate. The name
-        // string itself is left set (only visibility is affected) — see
-        // TrinityForgeIntegration#isSuppressNativeCombatDisplayEnabled.
+        // string itself is left set (only visibility is affected).
+        // 2026-08-01 round2: this used to read the MASTER switch (suppress-native-combat-display) while
+        // every other nametag site reads native-display-suppression.nametag, so setting nametag: false
+        // (master left true) un-hid the nametag everywhere except here. Both now go through the same
+        // policy — with the shipped defaults (master true, nametag true) the resolved value is unchanged.
         livingEntity.setCustomNameVisible(
-                !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled()
-                        && DefaultConfig.isAlwaysShowNametags());
+                com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.resolveSpawnNametagVisible(
+                        DefaultConfig.isAlwaysShowNametags(), false));
     }
 
     public void setName(String name, boolean applyToLivingEntity) {

@@ -14,6 +14,13 @@ import org.bukkit.event.Listener;
  * EliteMobs instanced-dungeon creation/join and cross-world teleports share one config.
  */
 public class TrinityForgeDungeonGateListener implements Listener {
+    private static final String ADMIN_PERMISSION = "trinityforge.admin";
+    private static final String TOOLING_PERMISSION = "trinityforge.elitemobs.commands";
+    private static final String GATE_UNAVAILABLE_MESSAGE =
+            "§cダンジョン入場条件を確認できないため入場できません。管理者へ連絡してください。";
+    // 「ゲート未設定」の文面は TrinityForge 側 (DungeonGateService#UNCONFIGURED_GATE) が出す。
+    // EliteMobs 側で同じ判定を持つと「ゲート0本なら機能ごと無効」の逃げ道を取りこぼすため、
+    // ここでは hasEntryGate を呼ばない。詳細は DungeonCommands#teleport のコメント。
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPreTeleport(PlayerPreTeleportEvent event) {
@@ -22,7 +29,7 @@ public class TrinityForgeDungeonGateListener implements Listener {
         if (destination == null || destination.getWorld() == null || player == null) {
             return;
         }
-        if (!checkDungeonEntryAllowed(player, destination.getWorld().getName())) {
+        if (!checkConfiguredTeleportAllowed(player, destination.getWorld().getName())) {
             event.setCancelled(true);
         }
     }
@@ -32,15 +39,59 @@ public class TrinityForgeDungeonGateListener implements Listener {
      * @return {@code true} if entry is allowed
      */
     public static boolean checkDungeonEntryAllowed(Player player, String lookupKey) {
-        if (player == null || lookupKey == null || lookupKey.isBlank()) {
+        return checkDungeonEntry(player, lookupKey, true);
+    }
+
+    /**
+     * Performs the same required-gate evaluation before an expensive instance clone, but leaves the
+     * key untouched. The later participant join calls {@link #checkDungeonEntryAllowed} and consumes it.
+     */
+    public static boolean previewDungeonEntryAllowed(Player player, String lookupKey) {
+        return checkDungeonEntry(player, lookupKey, false);
+    }
+
+    private static boolean checkDungeonEntry(Player player, String lookupKey, boolean consume) {
+        if (player == null) {
+            return false;
+        }
+        if (!TrinityForgeIntegration.isAvailable()) {
             return true;
         }
-        if (!TrinityForgeIntegration.isDungeonEntryGateEnabled()) {
+        if (player.hasPermission(ADMIN_PERMISSION) || player.hasPermission(TOOLING_PERMISSION)) {
+            return true;
+        }
+        if (lookupKey == null || lookupKey.isBlank()) {
+            player.sendMessage(GATE_UNAVAILABLE_MESSAGE);
+            return false;
+        }
+        DungeonGateService service = resolveGateService();
+        if (service == null) {
+            player.sendMessage(GATE_UNAVAILABLE_MESSAGE);
+            return false;
+        }
+        try {
+            return consume
+                    ? service.checkRequiredEntry(player, lookupKey)
+                    : service.previewRequiredEntry(player, lookupKey);
+        } catch (RuntimeException | LinkageError e) {
+            player.sendMessage(GATE_UNAVAILABLE_MESSAGE);
+            return false;
+        }
+    }
+
+    /**
+     * Shared EliteMobs teleport hook. Unlike an explicit dungeon join, unrelated routes such as
+     * {@code /em spawntp}, the Adventurers Guild and NPC return teleports are allowed when their
+     * destination has no dungeon gate.
+     */
+    private static boolean checkConfiguredTeleportAllowed(Player player, String lookupKey) {
+        if (!TrinityForgeIntegration.isAvailable()
+                || player.hasPermission(ADMIN_PERMISSION)
+                || player.hasPermission(TOOLING_PERMISSION)) {
             return true;
         }
         DungeonGateService service = resolveGateService();
         if (service == null) {
-            // Fail open when TF gate service unavailable
             return true;
         }
         try {

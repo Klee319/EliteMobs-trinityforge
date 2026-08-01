@@ -372,9 +372,9 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
         if (isValid() && customModel != null) {
             // TrinityForge integration (2026-08-01): the model plugin draws its own nametag at the
             // nametag-bone height, which is exactly where TrinityForge's FocusHp display sits.
-            boolean showName =
-                    !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressCustomModelNametagEnabled()
-                            && (DefaultConfig.isAlwaysShowNametags() || customBossesConfigFields.isAlwaysShowName());
+            boolean showName = com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy
+                    .resolveCustomModelNametagVisible(
+                            DefaultConfig.isAlwaysShowNametags() || customBossesConfigFields.isAlwaysShowName());
             customModel.setName(name, showName);
         }
     }
@@ -386,21 +386,22 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
         //If alwaysShowName is set for this boss, override to always visible
         // TrinityForge integration (2026-08-01): alwaysShowName is the reason custom bosses kept their
         // nametag even after EliteEntity#setName hid it — the override must not re-enable it while
-        // TrinityForge owns the overhead display.
-        boolean effectiveVisibility = isVisible
-                || (customBossesConfigFields.isAlwaysShowName()
-                && !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNametagEnabled());
+        // TrinityForge owns the overhead display. resolveCustomBossNametagVisible folds the
+        // alwaysShowName override and the suppression into one decision, so the entity, the
+        // LibsDisguises mirror and the custom model can never diverge from each other.
+        boolean requestedVisibility = isVisible || customBossesConfigFields.isAlwaysShowName();
+        boolean effectiveVisibility = com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy
+                .resolveCustomBossNametagVisible(isVisible, customBossesConfigFields.isAlwaysShowName());
         super.setNameVisible(effectiveVisibility);
-        // super.setNameVisible already applies the nametag suppression to the entity itself; mirror the
-        // same resolved state to LibsDisguises so the disguise nametag cannot diverge from it.
-        boolean entityNameVisible = effectiveVisibility
-                && !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNametagEnabled();
         if (Bukkit.getPluginManager().isPluginEnabled("LibsDisguises"))
-            DisguiseEntity.setDisguiseNameVisibility(entityNameVisible, livingEntity, name);
+            DisguiseEntity.setDisguiseNameVisibility(effectiveVisibility, livingEntity, name);
+        // The custom model's nametag is resolved from the REQUESTED visibility, not from the
+        // vanilla-nametag result: native-display-suppression.nametag and .custom-model-nametag are
+        // documented as independent switches, so suppressing the vanilla tag must not drag the model
+        // tag down with it (and vice versa). Same shape as setName(EliteMobProperties) above.
         if (customModel != null && isValid())
-            customModel.setNameVisible(effectiveVisibility
-                    && !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration
-                    .isSuppressCustomModelNametagEnabled());
+            customModel.setNameVisible(com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy
+                    .resolveCustomModelNametagVisible(requestedVisibility));
     }
 
     public void announceSpawn() {
@@ -416,7 +417,7 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
         // TrinityForge integration (2026-08-01): the tracking boss-bar shows distance/direction, which
         // TrinityForge has no equivalent for, so native-display-suppression.boss-tracking-bar defaults to
         // NOT suppressed. It is opt-in for servers that want the boss-bar row free for TrinityForge's own.
-        if (com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressBossTrackingBarEnabled())
+        if (!com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.allowBossTrackingBar())
             return;
         trackableCustomBosses.add(this);
         if (bossTrackingBar != null) bossTrackingBar.remove();

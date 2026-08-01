@@ -23,7 +23,7 @@ public class CustomBossDeath implements Listener {
         // pool, so elite-drop-sources.boss-unique-loot defaults to allowed — blocking it would silently
         // delete intended EliteMobs content. The switch exists for servers that want TrinityForge's
         // combat/mob-overrides.yml drops: to be the only drop table.
-        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isBossUniqueLootAllowed()) return;
+        if (!com.magmaguy.elitemobs.trinityforge.EliteDropPolicy.shouldDropBossUniqueLoot()) return;
         if (customBossEntity.customBossesConfigFields.getUniqueLootList() == null ||
                 customBossEntity.customBossesConfigFields.getUniqueLootList().isEmpty()) return;
 

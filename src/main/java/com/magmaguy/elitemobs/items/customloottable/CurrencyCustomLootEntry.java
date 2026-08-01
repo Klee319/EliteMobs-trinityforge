@@ -5,6 +5,7 @@ import com.magmaguy.elitemobs.config.ItemSettingsConfig;
 import com.magmaguy.elitemobs.config.StaticItemNamesConfig;
 import com.magmaguy.elitemobs.economy.EconomyHandler;
 import com.magmaguy.elitemobs.items.ItemLootShower;
+import com.magmaguy.elitemobs.trinityforge.EliteDropPolicy;
 import com.magmaguy.elitemobs.utils.MapListInterpreter;
 import com.magmaguy.magmacore.util.Logger;
 import lombok.Getter;
@@ -95,11 +96,21 @@ public class CurrencyCustomLootEntry extends CustomLootEntry implements Serializ
 
     @Override
     public void locationDrop(int itemTier, Player player, Location location) {
+        // TrinityForge (2026-08-01 round2): custom loot tables can hand out EliteCoin directly — the
+        // FOURTH currency-shower path. Same elite-drop-sources.currency-shower switch (default:
+        // allowed). `false` because this is not the bonus_coins power path.
+        if (!EliteDropPolicy.shouldRunCurrencyShower(false)) return;
         new ItemLootShower(location, player, currencyAmount);
     }
 
     @Override
     public void directDrop(int itemTier, Player player) {
+        // Same switch as locationDrop above: whether an EliteCoin reward arrives as a ground shower or
+        // straight into the inventory depends on ItemSettings.yml putLootDirectlyIntoPlayerInventory,
+        // which has nothing to do with whether the server wants EliteMobs handing out currency. Gating
+        // only the shower half would make elite-drop-sources.currency-shower silently ineffective on
+        // every server using direct-to-inventory loot.
+        if (!EliteDropPolicy.shouldRunCurrencyShower(false)) return;
         EconomyHandler.addCurrency(player.getUniqueId(), currencyAmount);
         player.sendMessage(ItemSettingsConfig.getDirectDropCoinMessage()
                 .replace("$amount", currencyAmount + "")

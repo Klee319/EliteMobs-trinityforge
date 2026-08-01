@@ -2,6 +2,7 @@ package com.magmaguy.elitemobs.items;
 
 import com.magmaguy.elitemobs.api.EliteMobDeathEvent;
 import com.magmaguy.elitemobs.config.ItemSettingsConfig;
+import com.magmaguy.elitemobs.trinityforge.EliteDropPolicy;
 import com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration;
 import com.trinityforge.config.ConfigManager;
 import com.trinityforge.pdc.MobData;
@@ -46,8 +47,7 @@ public class DefaultDropsHandler implements Listener {
         // TrinityForge counterpart, so it is gated by elite-drop-sources.vanilla-loot-multiplier
         // (default: blocked). The vanilla drops themselves are governed separately by
         // elite-drop-sources.vanilla-loot in LootTables#onDeath.
-        if (ItemSettingsConfig.getDefaultLootMultiplier() != 0
-                && TrinityForgeIntegration.isVanillaLootMultiplierAllowed()) {
+        if (EliteDropPolicy.shouldApplyVanillaLootMultiplier(ItemSettingsConfig.getDefaultLootMultiplier())) {
             for (ItemStack itemStack : droppedItems) {
 
                 if (itemStack == null) continue;

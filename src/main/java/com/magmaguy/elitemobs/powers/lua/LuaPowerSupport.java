@@ -461,6 +461,13 @@ final class LuaPowerSupport {
     }
 
     void dropBonusCoins(double coinMultiplier) {
+        // TrinityForge (2026-08-01 round2): the Lua scripting API's own coin shower — the THIRD of four
+        // currency-shower paths, and the one a content pack can call directly. Same
+        // elite-drop-sources.currency-shower switch (default: allowed). `false` because this is itself a
+        // bonus-coins path.
+        if (!com.magmaguy.elitemobs.trinityforge.EliteDropPolicy.shouldRunCurrencyShower(false)) {
+            return;
+        }
         if (eliteEntity.getUnsyncedLivingEntity() == null) {
             return;
         }

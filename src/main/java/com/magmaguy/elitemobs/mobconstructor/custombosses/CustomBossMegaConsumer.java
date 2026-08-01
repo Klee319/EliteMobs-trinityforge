@@ -58,8 +58,8 @@ public class CustomBossMegaConsumer {
         // was already suppressed but this one was not, so every custom boss (dungeon bosses included)
         // still spawned with its vanilla nametag on top of TrinityForge's FocusHp display. The name
         // string itself is still set; only visibility is suppressed.
-        boolean showName = !com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.isSuppressNametagEnabled()
-                && (DefaultConfig.isAlwaysShowNametags() || customBossEntity.customBossesConfigFields.isAlwaysShowName());
+        boolean showName = com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.resolveSpawnNametagVisible(
+                DefaultConfig.isAlwaysShowNametags(), customBossEntity.customBossesConfigFields.isAlwaysShowName());
         livingEntity.setCustomNameVisible(showName);
         if (Bukkit.getPluginManager().isPluginEnabled("LibsDisguises"))
             DisguiseEntity.setDisguiseNameVisibility(showName, livingEntity, parsedName);

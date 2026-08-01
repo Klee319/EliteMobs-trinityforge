@@ -144,6 +144,12 @@ public final class TrinityForgeIntegration {
         if (!file.exists()) {
             // Ship a default file from resources so admins can edit toggles without guessing keys.
             plugin.saveResource(CONFIG_FILE, false);
+        } else {
+            // The file already exists, so saveResource() above never runs and sections added by a newer
+            // jar would never appear on disk — the admin would be running code defaults with no key to
+            // change them by. Append (never overwrite) whatever is missing. See
+            // TrinityForgeConfigMigration.
+            migrateExistingConfig(plugin, file);
         }
         FileConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         gearNeutralization = yaml.getBoolean("gear-neutralization", true);
@@ -175,6 +181,37 @@ public final class TrinityForgeIntegration {
         allowCurrencyShower = yaml.getBoolean("elite-drop-sources.currency-shower", true);
         allowBossUniqueLoot = yaml.getBoolean("elite-drop-sources.boss-unique-loot", true);
         logSuppressedDropSources();
+    }
+
+    /**
+     * Appends the shipped {@code trinityforge.yml} sections that an already-existing on-disk file does
+     * not have, and says so in the startup log exactly once.
+     * <p>
+     * Only ever appends: existing values are never rewritten, so an admin's edits survive. Any failure
+     * is logged and swallowed — a config migration must never abort {@code onEnable} (the code defaults
+     * still apply, the admin just does not get the keys written out).
+     * <p>
+     * Logs through {@code plugin.getLogger()} rather than MagmaCore's {@code Logger} on purpose: this
+     * runs during config load, the plugin logger already carries the {@code [EliteMobs]} prefix, and it
+     * needs nothing from MagmaCore's static state — which is what lets
+     * {@code TrinityForgeLoadConfigMigrationTest} drive the real {@code loadConfig}.
+     */
+    private static void migrateExistingConfig(Plugin plugin, File file) {
+        try (java.io.InputStream shipped = plugin.getResource(CONFIG_FILE)) {
+            if (shipped == null) return;
+            String shippedText = new String(shipped.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            java.util.Set<String> present = YamlConfiguration.loadConfiguration(file).getKeys(false);
+            java.util.List<String> added =
+                    TrinityForgeConfigMigration.appendMissingKeys(file.toPath(), present, shippedText);
+            if (added.isEmpty()) return;
+            plugin.getLogger().info("TrinityForge: added " + added.size() + " new section(s) to the existing "
+                    + CONFIG_FILE + " so they are visible and editable: " + String.join(", ", added)
+                    + ". Existing values were left untouched.");
+        } catch (java.io.IOException | RuntimeException e) {
+            plugin.getLogger().warning("TrinityForge: could not add the new " + CONFIG_FILE
+                    + " sections to the existing file (" + e + "). The built-in defaults still apply, but "
+                    + "the new keys will not be visible in the file.");
+        }
     }
 
     /**
