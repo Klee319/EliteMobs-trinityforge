@@ -44,6 +44,10 @@ public class CombatLevelDisplay implements Listener {
      * @param player The player to create the display for
      */
     public static void createDisplay(Player player) {
+        // TrinityForge integration (fork spec item 3): TrinityForge draws the player's equipped title
+        // in this very band (nametag上端 + 余白), so a second mounted text here overlaps it.
+        // Single choke point: every other entry point in this class funnels into createDisplay.
+        if (!com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.allowPlayerCombatLevelDisplay()) return;
         if (!SkillsConfig.isSkillSystemEnabled()) return;
         if (!SkillsConfig.isShowCombatLevelDisplay()) return;
         if (NMSManager.getAdapter() == null) return;

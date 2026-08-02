@@ -13,6 +13,7 @@ import com.magmaguy.elitemobs.mobconstructor.custombosses.CustomBossEntity;
 import com.magmaguy.elitemobs.playerdata.database.PlayerData;
 import com.magmaguy.elitemobs.quests.objectives.*;
 import com.magmaguy.elitemobs.treasurechest.TreasureChest;
+import com.magmaguy.elitemobs.utils.SimpleScoreboard;
 import com.magmaguy.elitemobs.wormhole.WormholeNavigation;
 import com.magmaguy.magmacore.util.SpigotMessage;
 import lombok.Getter;
@@ -184,7 +185,12 @@ public class QuestTracking {
         new BukkitRunnable() {
             @Override
             public void run() {
-                player.setScoreboard(Bukkit.getScoreboardManager().getNewScoreboard());
+                // main のチームを複製した空スコアボードへ戻す(TF称号等の他プラグインのチーム表示が
+                // クエスト追跡終了後もmainへ戻らず消えたままになる不具合の修正。詳細は
+                // SimpleScoreboard#copyMainTeamsInto のjavadoc参照)。
+                org.bukkit.scoreboard.Scoreboard blank = Bukkit.getScoreboardManager().getNewScoreboard();
+                SimpleScoreboard.copyMainTeamsInto(blank);
+                player.setScoreboard(blank);
             }
         }.runTask(MetadataHandler.PLUGIN);
         locationRefresher.cancel();

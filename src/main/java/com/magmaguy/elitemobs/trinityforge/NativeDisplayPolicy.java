@@ -74,6 +74,21 @@ public final class NativeDisplayPolicy {
     }
 
     /**
+     * @return true when EliteMobs' own combat-level text display above PLAYERS
+     * ({@code CombatLevelDisplay}) may be created.
+     * <p>
+     * 2026-08-03: this was the one overhead display the master switch never reached. It mounts a
+     * packet {@code FakeText} on the player at {@code y + 0.5} — the exact band TrinityForge draws the
+     * equipped-title line in — so with both on, the two texts sit on top of each other. It was only
+     * invisible in practice because {@code SkillsConfig.showCombatLevelDisplay} defaults to false;
+     * turning that on would have silently reintroduced the overlap with no way to stop it from the
+     * TrinityForge side. Gated on the master switch like every other duplicate display.
+     */
+    public static boolean allowPlayerCombatLevelDisplay() {
+        return !TrinityForgeIntegration.isSuppressNativeCombatDisplayEnabled();
+    }
+
+    /**
      * @return true when the boss tracking boss-bar ("$name: $distance blocks away!") may be created. It
      * shows distance/direction, which TrinityForge has no equivalent for, so it is NOT a duplicate
      * display and defaults to allowed; suppressing it is opt-in for servers that want the boss-bar row
