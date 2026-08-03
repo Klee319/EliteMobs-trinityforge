@@ -99,11 +99,18 @@ public class DisguiseEntity {
         disguise.setEntity(entity);
         disguise.setDisguiseName(entity.getCustomName());
         disguise.setDynamicName(true);
-        if ((DefaultConfig.isAlwaysShowNametags() || entity.getType().equals(EntityType.VILLAGER))
-                && disguise instanceof PlayerDisguise) {
-            ((PlayerDisguise) disguise).setNameVisible(true);
-        } else if (disguise instanceof PlayerDisguise) {
-            ((PlayerDisguise) disguise).setNameVisible(false);
+        if (disguise instanceof PlayerDisguise) {
+            boolean requestedVisible = DefaultConfig.isAlwaysShowNametags() || entity.getType().equals(EntityType.VILLAGER);
+            // TrinityForge integration (2026-08-02): this method is also the target of
+            // DisguiseEntity#scheduleDisguise's +20-tick re-application, which used to read
+            // DefaultConfig.isAlwaysShowNametags() directly. CustomBossMegaConsumer#setName /
+            // CustomBossEntity#setNameVisible correctly suppress the PlayerDisguise nametag via
+            // DisguiseEntity#setDisguiseNameVisibility at spawn time, but 1 second later this re-apply task
+            // fired and un-hid it again on any server with alwaysShowEliteMobNameTags: true, bypassing
+            // native-display-suppression.nametag entirely. Routing through the same policy here closes that
+            // path for both the immediate application and the delayed re-application.
+            boolean showName = com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.resolveNametagVisible(requestedVisible);
+            ((PlayerDisguise) disguise).setNameVisible(showName);
         }
         disguise.startDisguise();
     }

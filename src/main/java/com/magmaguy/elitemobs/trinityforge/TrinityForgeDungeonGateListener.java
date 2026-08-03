@@ -32,8 +32,15 @@ import org.bukkit.event.Listener;
  * </ul>
  */
 public class TrinityForgeDungeonGateListener implements Listener {
-    private static final String ADMIN_PERMISSION = "trinityforge.admin";
-    private static final String TOOLING_PERMISSION = "trinityforge.elitemobs.commands";
+    // 2026-08-03: 権限バイパス(旧 ADMIN_PERMISSION/TOOLING_PERMISSION `trinityforge.admin` /
+    // `trinityforge.elitemobs.commands`)をこのクラスから削除した。DungeonGateService#requiredEntry
+    // (checkDungeonEntryAllowed/previewDungeonEntryAllowed 経由)が既に「判定に落ちたときだけ権限保持者を
+    // 救済する」形で同じ権限を内包しており、ここで先に `return true` すると鍵消費コード
+    // (DungeonGateService#evaluate の consume フェーズ)そのものを丸ごと飛び越してしまう
+    // (2026-08-03 実サーバ報告「ダンジョンの鍵が消費されなくなった」の原因、TF側は cf15493 で修正済み)。
+    // checkConfiguredTeleportAllowed 側(DungeonGateService#checkEntry/checkRegionEntry)はそもそも
+    // TF自身の DungeonGateListener(TeleportEvent/MoveEvent)も権限バイパスを持たない対称設計なので、
+    // ここだけ独自バイパスを持たせるのは元から一貫性を欠いていた。
     // 「ゲート未設定」の文面は TrinityForge 側 (DungeonGateService#UNCONFIGURED_GATE) が出す。
     // EliteMobs 側で同じ判定を持つと「ゲート0本なら機能ごと無効」の逃げ道を取りこぼすため、
     // ここでは hasEntryGate を呼ばない。詳細は DungeonCommands#teleport のコメント。
@@ -79,9 +86,6 @@ public class TrinityForgeDungeonGateListener implements Listener {
             // choice, not a degraded state, so it must not log a warning like the fail-open paths below.
             return true;
         }
-        if (player.hasPermission(ADMIN_PERMISSION) || player.hasPermission(TOOLING_PERMISSION)) {
-            return true;
-        }
         if (lookupKey == null || lookupKey.isBlank()) {
             // Could not even determine WHAT to ask TrinityForge about — a "TrinityForge unreachable"
             // failure, not a "TrinityForge said no" decision. Fail OPEN (see class javadoc).
@@ -108,9 +112,7 @@ public class TrinityForgeDungeonGateListener implements Listener {
      */
     private static boolean checkConfiguredTeleportAllowed(Player player, String lookupKey) {
         if (!TrinityForgeIntegration.isAvailable()
-                || !TrinityForgeIntegration.isDungeonEntryGateEnabled()
-                || player.hasPermission(ADMIN_PERMISSION)
-                || player.hasPermission(TOOLING_PERMISSION)) {
+                || !TrinityForgeIntegration.isDungeonEntryGateEnabled()) {
             return true;
         }
         DungeonGateService service = resolveGateService();

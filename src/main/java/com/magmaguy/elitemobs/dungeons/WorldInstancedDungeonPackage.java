@@ -26,7 +26,9 @@ public class WorldInstancedDungeonPackage extends EMPackage implements CombatCon
         DungeonInstallEvent event = new DungeonInstallEvent(contentPackagesConfigFields);
         new EventCaller(event);
         contentPackagesConfigFields.simpleInstall();
-        player.sendMessage(DungeonsConfig.getInstancedDungeonInstalledMessage().replace("$name", contentPackagesConfigFields.getFilename()));
+        // TrinityForge (2026-08-02): $name はプレイヤー表示用なので getFilename()(生ID)ではなく
+        // getName()(設定済み表示名)を使う。doUninstall 側は元から getName() を使っており非対称だった。
+        player.sendMessage(DungeonsConfig.getInstancedDungeonInstalledMessage().replace("$name", contentPackagesConfigFields.getName()));
         if (!contentPackagesConfigFields.isEnchantmentChallenge()) {
             player.sendMessage(DungeonsConfig.getInstancedDungeonAccessMessage());
             player.sendMessage(DungeonsConfig.getInstancedDungeonInstallNote());

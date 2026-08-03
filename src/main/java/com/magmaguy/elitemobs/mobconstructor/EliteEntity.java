@@ -326,8 +326,14 @@ public class EliteEntity {
         }
 
         if (entityType.equals(EntityType.ENDER_DRAGON))
-            if (((EnderDragon) livingEntity).getBossBar() != null)
+            if (((EnderDragon) livingEntity).getBossBar() != null) {
                 ((EnderDragon) livingEntity).getBossBar().setTitle(getName());
+                // TrinityForge integration (2026-08-02): the dragon's own top-of-screen boss bar was never
+                // hidden here — only its title was kept in sync — so every Ender Dragon elite/custom boss
+                // still showed a native HP bar duplicating TrinityForge's FocusHp display, exactly like the
+                // Wither case three lines below (which IS hidden). Matches that precedent.
+                ((EnderDragon) livingEntity).getBossBar().setVisible(false);
+            }
 
         if (entityType.equals(EntityType.LLAMA)) {
             KeepNeutralsAngry.showMeYouWarFace(this);

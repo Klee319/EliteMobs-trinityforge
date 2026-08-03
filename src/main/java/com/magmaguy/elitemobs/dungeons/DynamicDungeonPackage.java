@@ -26,7 +26,9 @@ public class DynamicDungeonPackage extends EMPackage implements CombatContent {
         DungeonInstallEvent event = new DungeonInstallEvent(contentPackagesConfigFields);
         new EventCaller(event);
         contentPackagesConfigFields.simpleInstall();
-        player.sendMessage(DungeonsConfig.getDynamicDungeonInstalledMessage().replace("$name", contentPackagesConfigFields.getFilename()));
+        // TrinityForge (2026-08-02): $name はプレイヤー表示用なので getFilename()(生ID)ではなく
+        // getName()(設定済み表示名)を使う。doUninstall 側は元から getName() を使っており非対称だった。
+        player.sendMessage(DungeonsConfig.getDynamicDungeonInstalledMessage().replace("$name", contentPackagesConfigFields.getName()));
         player.sendMessage(DungeonsConfig.getDynamicDungeonAccessMessage1());
         player.sendMessage(DungeonsConfig.getDynamicDungeonAccessMessage2());
         player.sendMessage(DungeonsConfig.getDynamicDungeonAccessMessage3());

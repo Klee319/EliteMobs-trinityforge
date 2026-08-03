@@ -153,5 +153,12 @@ public class TrinityForgeSpawnListener implements Listener {
             pdc.set(PdcKeys.MOB_ATTACK_DAMAGE_MODIFIER, PersistentDataType.DOUBLE, attack.damageModifier());
             pdc.set(PdcKeys.MOB_ATTACK_FIXED_DAMAGE, PersistentDataType.DOUBLE, attack.fixedDamage());
         }
+
+        // 2026-08-02 (実装1): magic-ratio は "型" であって "量" ではないので、hasAttack() のゲート
+        // (量が全部ゼロなら書かない)の外で無条件に書く。combat/mob-overrides.yml で attack-power 等を
+        // 一切設定せず magic-ratio だけを単独指定した約396体のダンジョンモブ(EliteMobs自身の
+        // ダメージ量をそのまま使う)でも、通常攻撃の型だけは魔法として解決できるようにするため。
+        // profile.attack() は hasAttack() の真偽に関わらず非null(既定 AttackStats、magicRatio既定0.0)。
+        pdc.set(PdcKeys.MOB_ATTACK_MAGIC_RATIO, PersistentDataType.DOUBLE, profile.attack().magicRatio());
     }
 }

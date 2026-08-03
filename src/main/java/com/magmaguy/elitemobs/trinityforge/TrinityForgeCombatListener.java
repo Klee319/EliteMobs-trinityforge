@@ -25,6 +25,10 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.persistence.PersistentDataHolder;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Delegates the final damage of every elite combat interaction to TrinityForge's symmetric pipeline
  * (fork spec section 2).
@@ -46,6 +50,27 @@ import org.bukkit.persistence.PersistentDataHolder;
  * any failure leaves EliteMobs' own damage untouched rather than breaking combat.
  */
 public class TrinityForgeCombatListener implements Listener {
+
+    /**
+     * 2026-08-02 ダメージランキング修正: {@link #onEliteDamagedByPlayer} が player→elite の一撃を
+     * 素のバニラBASEダメージへ意図的に戻す({@code vanillaBase}分岐)ため、この直後に
+     * {@code EliteMobDamagedByPlayerEvent} 内部の {@code eliteEntity.addDamager(player, damage)} が
+     * その未確定の小さい値をダメージランキング({@code EliteEntity#getDamagers()}/{@code aggro})へ
+     * 記録してしまう。実際に敵HPへ適用される最終値は、この直後に同じ生イベントの {@code HIGH} で走る
+     * TF 自身の {@code CombatListener} が計算する — つまり addDamager が呼ばれる時点では正しい値が
+     * まだ存在しない。
+     * <p>
+     * ここで書き戻す挙動自体({@code event.setDamage(vanillaBase)})は「エリートをワンパンできる」
+     * 事故の修正(クラスjavadoc参照)なので変更しない。代わりに、この時点で addDamager に記録された
+     * 値を退避しておき、生イベントが確定した後({@code MONITOR})に本当の最終ダメージとの差分だけを
+     * 追加補正する({@code addDamager} は累積加算なので差分適用で総量を合わせられる)。
+     * キーはエリートの{@link LivingEntity}のUUID — 1つの生イベント処理は同期的(メインスレッド)で、
+     * 同じ一撃の間に別の一撃が割り込むことはない。
+     */
+    private static final Map<UUID, PendingDamagerCorrection> pendingDamagerCorrections = new ConcurrentHashMap<>();
+
+    private record PendingDamagerCorrection(Player player, double recordedDamage) {
+    }
 
     // ------------------------------------------------------------------------------------------
     // CMB-02 (課題3, 2026-07-25) の二重適用ガードについて — 2026-07-28 に撤去した。
@@ -99,11 +124,45 @@ public class TrinityForgeCombatListener implements Listener {
             double vanillaBase = underlying.getDamage(EntityDamageEvent.DamageModifier.BASE);
             if (Double.isFinite(vanillaBase) && vanillaBase > 0) {
                 event.setDamage(vanillaBase);
+                // ダメージランキング補正の予約(このクラスのjavadoc参照)。この直後に EliteMobs 内部が
+                // addDamager(player, vanillaBase) を呼ぶので、生イベントが HIGH(TF CombatListener)まで
+                // 確定した後の MONITOR で本当の最終値との差分を追加する。
+                LivingEntity eliteLiving = livingEntityOf(event.getEliteMobEntity());
+                if (eliteLiving != null) {
+                    pendingDamagerCorrections.put(eliteLiving.getUniqueId(),
+                            new PendingDamagerCorrection(player, vanillaBase));
+                }
                 return;
             }
         }
         // #3: player's real TF attack stats (crit/penetration/bonus) fold into the elite-facing damage.
         applyPhysical(event::setDamage, victim, base, playerAttackStats(player));
+    }
+
+    /**
+     * 2026-08-02 ダメージランキング修正の後段。同じ生イベントが {@code MONITOR} まで到達した時点では、
+     * TF自身の {@code CombatListener}(HIGH)が既に最終ダメージを確定させている
+     * ({@code getFinalDamage()} = 実際にHPから引かれる量。エリートは装甲系modifierを0クランプしている
+     * ため通常は {@code getDamage()} と一致する)。{@link #onEliteDamagedByPlayer} が退避しておいた
+     * 「addDamagerに記録済みの値(vanillaBase)」との差分だけを追加することで、二重計上せずに
+     * ランキング/aggroの総量を本当の最終ダメージへ合わせる。{@code addDamager} は累積加算なので
+     * 差分適用が正しい(総量の付け替えであって上書きではない)。
+     * <p>
+     * イベントがキャンセルされた場合は実際には何もダメージが通っていないので補正しない(マップの
+     * エントリだけ掃除してリークを防ぐ)。予約が無い(= このクラスの vanillaBase 分岐を通らなかった、
+     * つまりプレイヤー攻撃以外/委譲無効時)ヒットは何もしない。
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onRawDamageFinalized(EntityDamageByEntityEvent event) {
+        PendingDamagerCorrection pending = pendingDamagerCorrections.remove(event.getEntity().getUniqueId());
+        if (pending == null) return;
+        if (event.isCancelled()) return;
+        EliteEntity eliteEntity = EntityTracker.getEliteMobEntity(event.getEntity());
+        if (eliteEntity == null) return;
+        double trueFinal = event.getFinalDamage();
+        double delta = trueFinal - pending.recordedDamage();
+        if (delta == 0) return;
+        eliteEntity.addDamager(pending.player(), delta);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -137,7 +196,15 @@ public class TrinityForgeCombatListener implements Listener {
         if (isTrinityForgeOwnedCause(event) && hasTrinityForgeAttackStamp(attacker)) return;
         // Mob attacker: its level scaling is already baked into the base by EliteMobs' LevelScaling, and it
         // carries no player offensive stats — so plain(0) and the player (victim) defense is what applies.
-        applyPhysical(event::setDamage, player, base, AttackStats.plain(0));
+        // 2026-08-02 (実装1): この分岐は「フル attack プロファイルは持たないが magic-ratio だけは
+        // combat/mob-overrides.yml で単独指定されているかもしれない」約396体のダンジョンモブの経路
+        // (上のガードで既にフル attack-power スタンプ持ちは弾かれている)。stampAttack() 側の
+        // MOB_ATTACK_MAGIC_RATIO は hasAttackProfile() のゲート外で無条件に書かれる
+        // (MobData#attackMagicRatio javadoc 参照)ので、ここで読んでも安全 — 未設定なら既定0.0で
+        // 従来どおり完全物理のまま。SymmetricCombatService#physicalFinalDamageFlat がこの比率で
+        // 物理/魔法へ分割する(実装1本体)。
+        applyPhysical(event::setDamage, player, base,
+                AttackStats.plain(0).withMagicRatio(mobAttackMagicRatio(attacker)));
     }
 
     /**
@@ -195,7 +262,24 @@ public class TrinityForgeCombatListener implements Listener {
         LivingEntity attacker = livingEntityOf(event.getDamager());
         PersistentDataHolder victim = livingEntityOf(event.getDamagee());
         if (attacker == null || victim == null) return;
-        applyPhysical(event::setDamage, victim, base, AttackStats.plain(0));
+        // 2026-08-02 (実装1): elite→elite も同じく攻撃側の magic-ratio を尊重する。
+        applyPhysical(event::setDamage, victim, base,
+                AttackStats.plain(0).withMagicRatio(mobAttackMagicRatio(attacker)));
+    }
+
+    /**
+     * Fail-closed to 0.0 (完全物理、従来どおり) so a TrinityForge classloading hiccup never silently
+     * routes a normal attack through the magical component. Mirrors {@link #hasTrinityForgeAttackStamp}'s
+     * guard style. See {@code MobData#attackMagicRatio()} — this reads {@code MOB_ATTACK_MAGIC_RATIO}
+     * independently of {@code hasAttackProfile()}, so it works for the ~396 dungeon mobs that only carry
+     * a magic-ratio override without a full attack-power stamp.
+     */
+    private static double mobAttackMagicRatio(LivingEntity attacker) {
+        try {
+            return MobData.of(attacker).attackMagicRatio();
+        } catch (NoClassDefFoundError | RuntimeException e) {
+            return 0.0;
+        }
     }
 
     private void applyPhysical(java.util.function.DoubleConsumer setter, PersistentDataHolder victim,
