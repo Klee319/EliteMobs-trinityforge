@@ -103,6 +103,13 @@ class TrinityForgeGateWiringTest {
                 "resolveCustomBossNametagVisible", "resolveCustomModelNametagVisible", "allowBossTrackingBar");
         assertReferences(constantPoolOf("com/magmaguy/elitemobs/mobconstructor/custombosses/CustomBossMegaConsumer"),
                 "CustomBossMegaConsumer", "NativeDisplayPolicy", "resolveSpawnNametagVisible");
+        // 2026-08-04: Lua パワースクリプト向けの set_custom_name_visible は抑止を完全に迂回しており、
+        // ネームタグを操作するパワーを持つボス(ダンジョンボスに多い)は抑止ONでも名前を出し続けていた。
+        // ここは無名クラス(ラムダ)にコンパイルされるので、定数プールは外側クラスではなく
+        // ラムダを収める合成クラス側に入り得る — そのため外側クラスのファイルだけでなく
+        // 実装メソッドを持つクラスを直接指定する。
+        assertReferences(constantPoolOf("com/magmaguy/elitemobs/powers/lua/LuaPowerEntityTables"),
+                "LuaPowerEntityTables", "NativeDisplayPolicy", "resolveNametagVisible");
     }
 
     @Test

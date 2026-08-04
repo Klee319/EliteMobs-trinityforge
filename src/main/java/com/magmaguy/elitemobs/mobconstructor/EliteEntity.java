@@ -368,6 +368,14 @@ public class EliteEntity {
 
         this.name = livingEntity.getCustomName();
 
+        // TrinityForge integration (2026-08-04): 上の setName() は getName() == null のときだけ走るので、
+        // 既に名前を持つ個体 — 永続ボス / チャンク再読み込みで再トラッキングされる個体 / 抑止が入る前から
+        // ワールドに居た個体 — では可視性が一度も解決し直されない。ネームタグの可視性はエンティティの
+        // NBT (CustomNameVisible) に保存されるため、抑止導入前に可視化されたものはそのまま残り続け、
+        // 二度と隠されなかった(実サーバ報告「頭上のテキストディスプレイがまだ消えていない」)。
+        // 抑止は「隠す方向にしか働かない」ので、ここで無条件に解決し直しても抑止OFF時の挙動は変わらない。
+        setNameVisible(livingEntity.isCustomNameVisible());
+
         PersistentTagger.tagElite(livingEntity, eliteUUID);
         EntityTracker.registerEliteMob(this);
     }

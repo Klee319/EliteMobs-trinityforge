@@ -401,7 +401,14 @@ final class LuaPowerEntityTables {
             return LuaValue.NIL;
         }));
         entity.set("set_custom_name_visible", method(entity, args -> {
-            livingEntity.setCustomNameVisible(args.checkboolean(1));
+            // TrinityForge integration (2026-08-04): この Lua API は
+            // native-display-suppression.nametag を完全に迂回しており、ネームタグを使うパワー
+            // スクリプトを持つボス(ダンジョンボスに多い)は抑止が入っていても頭上に名前を出し続けていた
+            // (実サーバ報告「EMモブの頭上のテキストディスプレイがまだ消えていない」の経路の一つ)。
+            // 抑止は「隠す方向にしか働かない」ので、false 指定はそのまま通る。
+            livingEntity.setCustomNameVisible(
+                    com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy.resolveNametagVisible(
+                            args.checkboolean(1)));
             return LuaValue.NIL;
         }));
         entity.set("set_ai_enabled", method(entity, args -> {
