@@ -131,6 +131,38 @@ class EliteDropPolicyTest {
         assertTrue(EliteDropPolicy.shouldDropBossUniqueLoot());
     }
 
+    // ---------------------------------------------------------------- treasure chest / arena loot
+
+    @Test
+    @DisplayName("treasure chest loot follows elite-drop-sources.treasure-chest-loot, independent of boss-unique-loot")
+    void treasureChestLoot() {
+        IntegrationState.set("available", true);
+        IntegrationState.set("allowBossUniqueLoot", false);
+
+        IntegrationState.set("allowTreasureChestLoot", true);
+        assertTrue(EliteDropPolicy.shouldDropTreasureChestLoot());
+        IntegrationState.set("allowTreasureChestLoot", false);
+        assertFalse(EliteDropPolicy.shouldDropTreasureChestLoot());
+
+        IntegrationState.set("available", false);
+        assertTrue(EliteDropPolicy.shouldDropTreasureChestLoot(), "standalone EliteMobs must be untouched");
+    }
+
+    @Test
+    @DisplayName("arena wave loot follows elite-drop-sources.arena-loot, independent of boss-unique-loot")
+    void arenaLoot() {
+        IntegrationState.set("available", true);
+        IntegrationState.set("allowBossUniqueLoot", false);
+
+        IntegrationState.set("allowArenaLoot", true);
+        assertTrue(EliteDropPolicy.shouldDropArenaLoot());
+        IntegrationState.set("allowArenaLoot", false);
+        assertFalse(EliteDropPolicy.shouldDropArenaLoot());
+
+        IntegrationState.set("available", false);
+        assertTrue(EliteDropPolicy.shouldDropArenaLoot(), "standalone EliteMobs must be untouched");
+    }
+
     // ---------------------------------------------------------------- vanilla drops (real list mutation)
 
     @Test

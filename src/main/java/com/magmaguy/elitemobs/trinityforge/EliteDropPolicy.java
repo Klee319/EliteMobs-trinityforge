@@ -88,6 +88,28 @@ public final class EliteDropPolicy {
     }
 
     /**
+     * EliteMobs' treasure-chest custom loot list ({@code CustomTreasureChestConfigFields.getLootList()},
+     * consumed by {@code CustomLootTable#treasureChestDrop}/{@code treasureChestDropAtLevel}/
+     * {@code treasureChestDropScalableToPlayerLevel}). This is a dungeon fixture entirely independent of
+     * {@code CustomBossDeath} — it never routes through {@link #shouldDropBossUniqueLoot()} — so it was a
+     * silent escape route for EliteMobs-authored items even with every other gate closed. Gated by
+     * {@code elite-drop-sources.treasure-chest-loot}.
+     */
+    public static boolean shouldDropTreasureChestLoot() {
+        return TrinityForgeIntegration.isTreasureChestLootAllowed();
+    }
+
+    /**
+     * EliteMobs' Adventurer's Guild arena wave rewards ({@code CustomArenasConfigFields.getRawArenaRewards()},
+     * consumed by {@code CustomLootTable#arenaReward}). Same shape as
+     * {@link #shouldDropTreasureChestLoot()}: authored loot handed out by an instanced EliteMobs feature
+     * without ever touching {@code CustomBossDeath}. Gated by {@code elite-drop-sources.arena-loot}.
+     */
+    public static boolean shouldDropArenaLoot() {
+        return TrinityForgeIntegration.isArenaLootAllowed();
+    }
+
+    /**
      * Applies {@code elite-drop-sources.vanilla-loot} to an elite's vanilla death drops, clearing the
      * list in place when they are not allowed to survive.
      * <p>

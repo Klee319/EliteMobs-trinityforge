@@ -120,7 +120,13 @@ public class DisguiseEntity {
         Disguise disguise = DisguiseAPI.getDisguise(entity);
         if (disguise == null) return;
         if (disguise instanceof PlayerDisguise) {
-            ((PlayerDisguise) disguise).setNameVisible(true);
+            // TrinityForge integration (2026-08-04): this hard-coded `true` discarded the caller's
+            // already-policy-resolved value. Both call sites (CustomBossMegaConsumer#setName at spawn,
+            // CustomBossEntity#setNameVisible on combat enter/exit) pass the value AFTER routing it
+            // through NativeDisplayPolicy, so ignoring it here silently re-showed the LibsDisguises
+            // nametag on every custom-boss spawn and combat transition regardless of
+            // native-display-suppression.nametag.
+            ((PlayerDisguise) disguise).setNameVisible(disguiseNameVisibility);
         }
     }
 }

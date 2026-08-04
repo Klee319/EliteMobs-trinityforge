@@ -367,8 +367,15 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
     @Override
     public void setName(String name, boolean applyToLivingEntity) {
         super.setName(name, applyToLivingEntity);
+        // TrinityForge integration (2026-08-04): this overload is reached from setPluginName() every time
+        // a custom boss' level-formatted name is (re)parsed — a hard-coded `true` here bypassed
+        // NativeDisplayPolicy entirely and forced the model's nametag back on regardless of
+        // native-display-suppression.custom-model-nametag, unlike the sibling
+        // setName(EliteMobProperties)/setNameVisible(boolean) overrides below which already route through
+        // resolveCustomModelNametagVisible.
         if (isValid() && customModel != null)
-            customModel.setName(name, true);
+            customModel.setName(name, com.magmaguy.elitemobs.trinityforge.NativeDisplayPolicy
+                    .resolveCustomModelNametagVisible(true));
     }
 
     @Override

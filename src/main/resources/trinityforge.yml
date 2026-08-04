@@ -119,8 +119,19 @@ elite-drop-sources:
   # dropsVanillaLoot: true のモブが落とすバニラドロップそのもの。
   # false にすると dropsVanillaLoot: false のモブと同じく EntityDeathEvent の drops を空にします
   # (TrinityForge 側の追加ドロップは後段で足されるので影響を受けません)。
+  # ここは意図的に true のままにしてください: モブ本来のバニラドロップ(TrinityForgeの
+  # combat/mob-overrides.yml drops: / mob-level-table.yml add-drops: が前提にしている通常の
+  # 死亡ドロップ)を消してしまいます。「EliteMobs側で設定したアイテムを一切落とさない」ためには
+  # 下の各キーだけを false にすれば十分です。
   vanilla-loot: true
-  # ギルド通貨 (EliteCoin) のドロップシャワー。
-  currency-shower: true
+  # ギルド通貨 (EliteCoin) のドロップシャワー。4つの発生経路 (LootTables の汎用シャワー /
+  # bonus_coins.yml パワー / カスタムルートテーブルの currencyAmount エントリ) すべてに効きます。
+  currency-shower: false
   # custombosses/*.yml の uniqueLootList (そのボス専用に書かれたドロップ)。
-  boss-unique-loot: true
+  boss-unique-loot: false
+  # カスタムの宝箱 (customtreasurechests/*.yml の lootList) から出るアイテム。
+  # CustomBossDeath を経由しない別経路のため、boss-unique-loot とは独立したキーです。
+  treasure-chest-loot: false
+  # ギルドのアリーナ (customarenas/*.yml の arenaRewards、ウェーブ報酬) から出るアイテム。
+  # これも CustomBossDeath を経由しない別経路のため、独立したキーです。
+  arena-loot: false

@@ -70,6 +70,14 @@ class TrinityForgeGateWiringTest {
     }
 
     @Test
+    @DisplayName("CustomLootTable consults the treasure-chest-loot and arena-loot gates (paths independent of CustomBossDeath)")
+    void customLootTableIsWired() throws IOException {
+        String bytecode = constantPoolOf("com/magmaguy/elitemobs/items/customloottable/CustomLootTable");
+        assertReferences(bytecode, "CustomLootTable", "EliteDropPolicy",
+                "shouldDropTreasureChestLoot", "shouldDropArenaLoot");
+    }
+
+    @Test
     @DisplayName("all four currency-shower paths consult the same gate")
     void everyCurrencyShowerPathIsWired() throws IOException {
         // 2026-08-01 round2: only LootTables was gated, so the bonus_coins power, the Lua scripting API

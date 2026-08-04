@@ -7,6 +7,7 @@ import com.magmaguy.elitemobs.config.custombosses.CustomBossesConfigFields;
 import com.magmaguy.elitemobs.config.customquests.CustomQuestsConfigFields;
 import com.magmaguy.elitemobs.config.customtreasurechests.CustomTreasureChestConfigFields;
 import com.magmaguy.elitemobs.mobconstructor.EliteEntity;
+import com.magmaguy.elitemobs.trinityforge.EliteDropPolicy;
 import lombok.Getter;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -104,6 +105,13 @@ public class CustomLootTable implements Serializable {
     }
 
     public void treasureChestDrop(Player player, int chestLevel, Location dropLocation) {
+        // TrinityForge (2026-08-04): treasure chests hand out this same authored CustomLootTable content
+        // as custom bosses, but never route through CustomBossDeath, so shouldDropBossUniqueLoot() never
+        // sees this call — a dedicated gate is required. See EliteDropPolicy#shouldDropTreasureChestLoot.
+        if (!EliteDropPolicy.shouldDropTreasureChestLoot()) {
+            player.sendMessage(DefaultConfig.getTreasureChestNoDropMessage());
+            return;
+        }
         boolean anythingDropped = false;
         for (CustomLootEntry customLootEntry : entries)
             if (customLootEntry.willDrop(player)) {
@@ -119,6 +127,12 @@ public class CustomLootTable implements Serializable {
     }
 
     public void treasureChestDropAtLevel(Player player, int level, Location dropLocation) {
+        // TrinityForge (2026-08-04): same gate as treasureChestDrop above — this overload is the one
+        // actually called for dynamic-dungeon treasure chests (TreasureChest#openChest).
+        if (!EliteDropPolicy.shouldDropTreasureChestLoot()) {
+            player.sendMessage(DefaultConfig.getTreasureChestNoDropMessage());
+            return;
+        }
         boolean anythingDropped = false;
         for (CustomLootEntry customLootEntry : entries)
             if (customLootEntry.willDrop(player)) {
@@ -148,6 +162,11 @@ public class CustomLootTable implements Serializable {
     }
 
     public void treasureChestDropScalableToPlayerLevel(Player player, int chestLevel, int playerLevel, Location dropLocation) {
+        // TrinityForge (2026-08-04): same gate as treasureChestDrop above.
+        if (!EliteDropPolicy.shouldDropTreasureChestLoot()) {
+            player.sendMessage(DefaultConfig.getTreasureChestNoDropMessage());
+            return;
+        }
         boolean anythingDropped = false;
         int defaultLevel = chestLevel * 10;
         for (CustomLootEntry customLootEntry : entries)
@@ -184,6 +203,10 @@ public class CustomLootTable implements Serializable {
     }
 
     public void arenaReward(Player player, int wave) {
+        // TrinityForge (2026-08-04): Adventurer's Guild arena rewards are authored CustomLootTable content
+        // handed out without ever routing through CustomBossDeath — a dedicated gate is required. See
+        // EliteDropPolicy#shouldDropArenaLoot.
+        if (!EliteDropPolicy.shouldDropArenaLoot()) return;
         if (waveRewards.get(wave) == null) return;
         waveRewards.get(wave).forEach(reward -> {
             if (reward.willDrop(player)) reward.directDrop(reward.getItemLevel(), player);

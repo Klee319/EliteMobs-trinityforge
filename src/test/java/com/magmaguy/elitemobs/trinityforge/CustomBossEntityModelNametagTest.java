@@ -69,6 +69,35 @@ class CustomBossEntityModelNametagTest {
                         + "drag down native-display-suppression.custom-model-nametag too.");
     }
 
+    /**
+     * 2026-08-04: {@code CustomBossEntity#setName(String, boolean)} — reached from
+     * {@code setPluginName()} whenever a boss' level-formatted name is (re)parsed — used to call
+     * {@code customModel.setName(name, true)} with a hard-coded {@code true}, bypassing
+     * {@code NativeDisplayPolicy} entirely. Unlike {@code setName(EliteMobProperties)} and
+     * {@code setNameVisible(boolean)} (both already covered above / by {@link NativeDisplayPolicyTest}),
+     * this overload never consulted {@code resolveCustomModelNametagVisible}, so the model's nametag
+     * came back on every time a boss' name was reformatted regardless of
+     * {@code native-display-suppression.custom-model-nametag}.
+     */
+    @Test
+    @DisplayName("setName(String, boolean) suppresses the custom model's nametag exactly like the other overloads")
+    void setNameOverloadSuppressesModelNametag() throws Exception {
+        IntegrationState.set("available", true);
+        IntegrationState.set("suppressCustomModelNametag", true);
+
+        RecordingLivingEntity livingEntity = new RecordingLivingEntity();
+        RecordingCustomModel model = new RecordingCustomModel();
+        CustomBossEntity boss = bossWith(livingEntity.proxy(), model.proxy(), false);
+
+        boss.setName("Some Boss", false);
+
+        assertEquals(List.of(false), model.setNameVisibleArgs,
+                "customModel.setName(name, visible) must resolve visible=false when "
+                        + "native-display-suppression.custom-model-nametag is on. If this reads [true], "
+                        + "the hard-coded `true` regressed (2026-08-04) and the model nametag bypasses "
+                        + "suppression again.");
+    }
+
     /** Builds a CustomBossEntity without running its heavy real constructor. */
     private static CustomBossEntity bossWith(LivingEntity livingEntity, CustomModelInterface model,
                                               boolean alwaysShowName) throws ReflectiveOperationException {
@@ -125,9 +154,11 @@ class CustomBossEntityModelNametagTest {
         }
     }
 
-    /** Records every {@code setNameVisible} write on the custom model. */
+    /** Records every {@code setNameVisible} and {@code setName(name, visible)} write on the custom model. */
     private static final class RecordingCustomModel implements InvocationHandler {
         private final List<Boolean> nameVisibleWrites = new ArrayList<>();
+        /** The {@code visible} argument of every {@code setName(String, boolean)} call. */
+        private final List<Boolean> setNameVisibleArgs = new ArrayList<>();
 
         CustomModelInterface proxy() {
             return (CustomModelInterface) Proxy.newProxyInstance(
@@ -139,6 +170,9 @@ class CustomBossEntityModelNametagTest {
             switch (method.getName()) {
                 case "setNameVisible":
                     nameVisibleWrites.add((Boolean) args[0]);
+                    return null;
+                case "setName":
+                    setNameVisibleArgs.add((Boolean) args[1]);
                     return null;
                 case "getNametagBoneLocation":
                     return (Location) null;

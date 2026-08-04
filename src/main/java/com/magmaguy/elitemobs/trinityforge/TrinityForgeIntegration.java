@@ -89,6 +89,11 @@ public final class TrinityForgeIntegration {
     private static boolean allowVanillaLoot = true;
     private static boolean allowCurrencyShower = true;
     private static boolean allowBossUniqueLoot = true;
+    // 2026-08-04: treasure chests and arena waves hand out EliteMobs-authored CustomLootTable entries
+    // through a path that never touches CustomBossDeath (see EliteDropPolicy javadoc), so they need their
+    // own switches rather than piggybacking on boss-unique-loot.
+    private static boolean allowTreasureChestLoot = false;
+    private static boolean allowArenaLoot = false;
 
     private TrinityForgeIntegration() {
     }
@@ -191,6 +196,11 @@ public final class TrinityForgeIntegration {
         allowVanillaLoot = yaml.getBoolean("elite-drop-sources.vanilla-loot", true);
         allowCurrencyShower = yaml.getBoolean("elite-drop-sources.currency-shower", true);
         allowBossUniqueLoot = yaml.getBoolean("elite-drop-sources.boss-unique-loot", true);
+        // Missing key = blocked by default (matches the other authored-content-adjacent random pools):
+        // an admin who never sees this key on an already-existing elite-drop-sources: section (see
+        // TrinityForgeConfigMigration's top-level-only scope limit) still gets it closed.
+        allowTreasureChestLoot = yaml.getBoolean("elite-drop-sources.treasure-chest-loot", false);
+        allowArenaLoot = yaml.getBoolean("elite-drop-sources.arena-loot", false);
         logSuppressedDropSources();
     }
 
@@ -240,6 +250,8 @@ public final class TrinityForgeIntegration {
         if (!allowVanillaLoot) blocked.add("vanilla-loot");
         if (!allowCurrencyShower) blocked.add("currency-shower");
         if (!allowBossUniqueLoot) blocked.add("boss-unique-loot");
+        if (!allowTreasureChestLoot) blocked.add("treasure-chest-loot");
+        if (!allowArenaLoot) blocked.add("arena-loot");
         if (blocked.isEmpty()) {
             Logger.info("TrinityForge: every EliteMobs drop source is enabled (elite-drop-sources).");
             return;
@@ -434,6 +446,16 @@ public final class TrinityForgeIntegration {
     /** A custom boss' own authored {@code uniqueLootList} (custombosses/*.yml). */
     public static boolean isBossUniqueLootAllowed() {
         return dropSourceAllowed(allowBossUniqueLoot);
+    }
+
+    /** EliteMobs' treasure-chest custom loot list (dungeon fixture, independent of CustomBossDeath). */
+    public static boolean isTreasureChestLootAllowed() {
+        return dropSourceAllowed(allowTreasureChestLoot);
+    }
+
+    /** EliteMobs' Adventurer's Guild arena wave rewards (independent of CustomBossDeath). */
+    public static boolean isArenaLootAllowed() {
+        return dropSourceAllowed(allowArenaLoot);
     }
 
     public static SymmetricCombatService combatService() {

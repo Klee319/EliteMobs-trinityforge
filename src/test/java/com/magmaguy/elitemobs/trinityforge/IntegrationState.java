@@ -14,7 +14,8 @@ final class IntegrationState {
     /** Every {@code elite-drop-sources} toggle field, in trinityforge.yml order. */
     static final String[] DROP_TOGGLES = {
             "allowRandomEliteLoot", "allowSpecialLoot", "allowEliteScroll",
-            "allowVanillaLootMultiplier", "allowVanillaLoot", "allowCurrencyShower", "allowBossUniqueLoot"};
+            "allowVanillaLootMultiplier", "allowVanillaLoot", "allowCurrencyShower", "allowBossUniqueLoot",
+            "allowTreasureChestLoot", "allowArenaLoot"};
 
     /** Every {@code native-display-suppression} toggle field, in trinityforge.yml order. */
     static final String[] DISPLAY_TOGGLES = {
