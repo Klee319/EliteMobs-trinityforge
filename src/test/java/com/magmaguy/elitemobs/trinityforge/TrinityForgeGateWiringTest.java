@@ -63,6 +63,17 @@ class TrinityForgeGateWiringTest {
     }
 
     @Test
+    @DisplayName("ItemLootShower/ArenaInstance route the gear-tier lockout through the policy (2026-08-09)")
+    void levelDifferenceLockoutIsWired() throws IOException {
+        // 上流の「装備tier差で戦利品を全部止める」判定を素の比較へ書き戻すと(= TrinityForge の
+        // level-cutoff と二重に足きりされる状態へ戻すと)ここが落ちる。
+        assertReferences(constantPoolOf("com/magmaguy/elitemobs/items/ItemLootShower"),
+                "ItemLootShower", "EliteDropPolicy", "blocksLootByLevelDifference");
+        assertReferences(constantPoolOf("com/magmaguy/elitemobs/instanced/arena/ArenaInstance"),
+                "ArenaInstance", "EliteDropPolicy", "blocksLootByLevelDifference");
+    }
+
+    @Test
     @DisplayName("CustomBossDeath consults the boss-unique-loot gate")
     void customBossDeathIsWired() throws IOException {
         String bytecode = constantPoolOf("com/magmaguy/elitemobs/mobconstructor/custombosses/CustomBossDeath");

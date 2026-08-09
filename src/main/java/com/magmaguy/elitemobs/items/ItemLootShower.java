@@ -5,6 +5,7 @@ import com.magmaguy.easyminecraftgoals.internal.FakeItem;
 import com.magmaguy.elitemobs.MetadataHandler;
 import com.magmaguy.elitemobs.config.EconomySettingsConfig;
 import com.magmaguy.elitemobs.config.ItemSettingsConfig;
+import com.magmaguy.elitemobs.trinityforge.EliteDropPolicy;
 import com.magmaguy.elitemobs.economy.EconomyHandler;
 import com.magmaguy.elitemobs.entitytracker.EntityTracker;
 import com.magmaguy.elitemobs.items.customenchantments.SoulbindEnchantment;
@@ -64,8 +65,12 @@ public class ItemLootShower {
         if (!useFakeItems() && !SoulbindEnchantment.isEnabled)
             return;
 
-        if (Math.abs(mobLevel - ElitePlayerInventory.playerInventories.get(player.getUniqueId()).getFullPlayerTier(false))
-                > ItemSettingsConfig.getLootLevelDifferenceLockout()) {
+        // 2026-08-09: TrinityForge 導入時はこの「装備tier差による足きり」を行わない
+        // (TrinityForge の combat/damage.yml level-cutoff が全モブ共通で同じ役割を担う)。
+        // 単体運用時は上流どおりの比較になる。詳細は EliteDropPolicy#blocksLootByLevelDifference。
+        if (EliteDropPolicy.blocksLootByLevelDifference(
+                (int) Math.abs(mobLevel - ElitePlayerInventory.playerInventories.get(player.getUniqueId()).getFullPlayerTier(false)),
+                ItemSettingsConfig.getLootLevelDifferenceLockout())) {
             new BukkitRunnable() {
                 int counter = 0;
 

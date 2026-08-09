@@ -88,7 +88,11 @@ public final class TrinityForgeIntegration {
     private static boolean allowVanillaLootMultiplier = false;
     private static boolean allowVanillaLoot = true;
     private static boolean allowCurrencyShower = true;
-    private static boolean allowBossUniqueLoot = true;
+    // 2026-08-09: 既定を true から false へ反転した。「EliteMobs 由来の戦利品は一切出さない」が
+    // 運用方針として確定し、TrinityForge が全アイテムのステータス/品質/入手経路を一元管理する。
+    // ここが true のままだと、この節が既に書かれている配備済み yml (TrinityForgeConfigMigration は
+    // トップレベルのキーしか追記しない) でキーが欠けたときに uniqueLootList が黙って復活する。
+    private static boolean allowBossUniqueLoot = false;
     // 2026-08-04: treasure chests and arena waves hand out EliteMobs-authored CustomLootTable entries
     // through a path that never touches CustomBossDeath (see EliteDropPolicy javadoc), so they need their
     // own switches rather than piggybacking on boss-unique-loot.
@@ -195,7 +199,8 @@ public final class TrinityForgeIntegration {
         allowVanillaLootMultiplier = yaml.getBoolean("elite-drop-sources.vanilla-loot-multiplier", false);
         allowVanillaLoot = yaml.getBoolean("elite-drop-sources.vanilla-loot", true);
         allowCurrencyShower = yaml.getBoolean("elite-drop-sources.currency-shower", true);
-        allowBossUniqueLoot = yaml.getBoolean("elite-drop-sources.boss-unique-loot", true);
+        // 2026-08-09: 既定を false に反転(フィールド宣言のコメント参照)。
+        allowBossUniqueLoot = yaml.getBoolean("elite-drop-sources.boss-unique-loot", false);
         // Missing key = blocked by default (matches the other authored-content-adjacent random pools):
         // an admin who never sees this key on an already-existing elite-drop-sources: section (see
         // TrinityForgeConfigMigration's top-level-only scope limit) still gets it closed.

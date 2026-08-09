@@ -131,6 +131,24 @@ class EliteDropPolicyTest {
         assertTrue(EliteDropPolicy.shouldDropBossUniqueLoot());
     }
 
+    // ---------------------------------------------------------------- gear-tier lockout (2026-08-09)
+
+    @Test
+    @DisplayName("装備tier差の足きりは TrinityForge 導入時は無効、単体運用時は上流どおり")
+    void levelDifferenceLockout() {
+        IntegrationState.set("available", true);
+        assertFalse(EliteDropPolicy.blocksLootByLevelDifference(50, 10),
+                "TrinityForge 導入時は combat/damage.yml の level-cutoff が唯一の足きり。"
+                        + "装備tier差の上流ロックアウトと二重に掛けない");
+        assertFalse(EliteDropPolicy.blocksLootByLevelDifference(0, 10));
+
+        IntegrationState.set("available", false);
+        assertTrue(EliteDropPolicy.blocksLootByLevelDifference(50, 10),
+                "standalone EliteMobs must be untouched");
+        assertFalse(EliteDropPolicy.blocksLootByLevelDifference(10, 10), "境界は「超えたら」なので等しいときは通す");
+        assertFalse(EliteDropPolicy.blocksLootByLevelDifference(0, 10));
+    }
+
     // ---------------------------------------------------------------- treasure chest / arena loot
 
     @Test

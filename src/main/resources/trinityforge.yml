@@ -97,11 +97,14 @@ native-display-suppression:
 # ここではその経路を1つずつ止められます。どれを止めたかは起動時にログへ1行出ます。
 #
 # 既定を「止める」にした理由:
-#   ランダム生成品・特殊枠・スクロール・バニラ増殖は、アイテムのステータス/品質/入手経路を
-#   TrinityForge が一元管理する構成では「設定していないのに落ちるアイテム」そのものになるため。
+#   アイテムのステータス/品質/入手経路を TrinityForge が一元管理する構成では、EliteMobs 由来の
+#   戦利品はどれも「設定していないのに落ちるアイテム」になるため。2026-08-09 に運用方針が
+#   「EliteMobs のドロップは一切出さない」で確定し、ボス専用の uniqueLootList も止める側へ移した
+#   (boss-unique-loot のコード既定も true → false へ反転済み)。
+#   ダンジョンで配りたいアイテムは TrinityForge の combat/mob-overrides.yml drops: に書くこと。
 # 既定を「残す」にした理由:
-#   uniqueLootList はそのボスのために書かれた意図的なコンテンツで、通貨はギルド機能の前提のため。
-#   これらまで黙って消すと別のバグ報告になります。
+#   vanilla-loot はモブ本来の死亡ドロップそのもので、これを消すと TrinityForge の追加ドロップが
+#   前提にしている通常ドロップまで消える。通貨シャワーはギルド機能の前提。
 #
 # TrinityForge 未導入時はすべてのキーが無視され、素の EliteMobs と同じ挙動になります。
 elite-drop-sources:
@@ -128,6 +131,9 @@ elite-drop-sources:
   # bonus_coins.yml パワー / カスタムルートテーブルの currencyAmount エントリ) すべてに効きます。
   currency-shower: false
   # custombosses/*.yml の uniqueLootList (そのボス専用に書かれたドロップ)。
+  # false にすると CustomBossDeath の戦利品配布そのものが走らなくなるため、EliteMobs の
+  # 共有戦利品テーブル (emloot、need/greed) も生成されなくなる点に注意。マルチでダンジョンに
+  # 潜ったときの分配は TrinityForge 側の追加ドロップを共有テーブルへ流す橋が担当する。
   boss-unique-loot: false
   # カスタムの宝箱 (customtreasurechests/*.yml の lootList) から出るアイテム。
   # CustomBossDeath を経由しない別経路のため、boss-unique-loot とは独立したキーです。

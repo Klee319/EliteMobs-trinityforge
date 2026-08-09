@@ -110,6 +110,33 @@ public final class EliteDropPolicy {
     }
 
     /**
+     * EliteMobs' own 「格上狩り」 lockout ({@code ItemSettings.yml lootLevelDifferenceLockout}, default 10):
+     * a player whose <em>gear tier</em> differs from the mob's level by more than that gets no loot at all.
+     * <p>
+     * <b>Disabled whenever TrinityForge is present (2026-08-09).</b> TrinityForge now runs its own
+     * level-difference cutoff for every mob on the server ({@code combat/damage.yml} の
+     * {@code level-cutoff:}), and the two disagree on both the input and the effect:
+     * <ul>
+     *   <li>Input — this one compares <b>装備の平均tier</b> ({@code getFullPlayerTier}), TrinityForge
+     *       compares the player's <b>戦闘レベル</b>. A player in low-tier gear farming a high-level boss
+     *       is locked out here while TrinityForge considers them格下 and lets them through.</li>
+     *   <li>Effect — this one is all-or-nothing and silent-ish (an action-bar message), TrinityForge
+     *       scales EXP/ドロップ率 by a configurable rate.</li>
+     * </ul>
+     * Leaving both on meant a server operator who set {@code level-cutoff} to "no cutoff" still hit an
+     * invisible EliteMobs lockout inherited from the upstream default. Standalone EliteMobs is unaffected:
+     * with TrinityForge absent this returns the upstream comparison verbatim.
+     *
+     * @param levelDifference the absolute difference upstream computed (gear tier vs mob level)
+     * @param lockout         {@code ItemSettingsConfig#getLootLevelDifferenceLockout()}
+     * @return true when the loot must be withheld
+     */
+    public static boolean blocksLootByLevelDifference(int levelDifference, int lockout) {
+        if (TrinityForgeIntegration.isAvailable()) return false;
+        return levelDifference > lockout;
+    }
+
+    /**
      * Applies {@code elite-drop-sources.vanilla-loot} to an elite's vanilla death drops, clearing the
      * list in place when they are not allowed to survive.
      * <p>

@@ -9,6 +9,7 @@ import com.magmaguy.elitemobs.api.internal.RemovalReason;
 import com.magmaguy.elitemobs.config.AdventurersGuildConfig;
 import com.magmaguy.elitemobs.config.ArenasConfig;
 import com.magmaguy.elitemobs.config.ItemSettingsConfig;
+import com.magmaguy.elitemobs.trinityforge.EliteDropPolicy;
 import com.magmaguy.elitemobs.config.customarenas.CustomArenasConfigFields;
 import com.magmaguy.elitemobs.instanced.MatchInstance;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.CustomBossEntity;
@@ -304,7 +305,11 @@ public class ArenaInstance extends MatchInstance {
         super.players.forEach(player -> {
             if (highestArenaMobLevel > 0) {
                 // Guild rank loot limiter removed
-                if (Math.abs(ElitePlayerInventory.getPlayer(player).getFullPlayerTier(true) - highestArenaMobLevel) > ItemSettingsConfig.getLootLevelDifferenceLockout()) {
+                // 2026-08-09: TrinityForge 導入時は装備tier差による足きりを行わない
+                // (EliteDropPolicy#blocksLootByLevelDifference 参照)。単体運用時は上流どおり。
+                if (EliteDropPolicy.blocksLootByLevelDifference(
+                        (int) Math.abs(ElitePlayerInventory.getPlayer(player).getFullPlayerTier(true) - highestArenaMobLevel),
+                        ItemSettingsConfig.getLootLevelDifferenceLockout())) {
                     Logger.sendSimpleMessage(player, ItemSettingsConfig.getLevelRangeTooDifferent()
                             .replace("$playerLevel", ElitePlayerInventory.playerInventories.get(player.getUniqueId()).getFullPlayerTier(false) + "")
                             .replace("$bossLevel", highestArenaMobLevel + ""));
