@@ -60,17 +60,19 @@ public class PlayerPotionEffects implements Listener {
         if (elitePotionEffect.getPotionEffect().getType().equals(PotionEffectType.ABSORPTION)) return;
         if (elitePotionEffect.getPotionEffect().getType().equals(PotionEffectType.HEALTH_BOOST)) return;
 
-        // Check if player already has this effect active
-        if (player.hasPotionEffect(elitePotionEffect.getPotionEffect().getType())) {
-            PotionEffect existingEffect = player.getPotionEffect(elitePotionEffect.getPotionEffect().getType());
-            // Don't override if existing effect has higher amplifier
-            if (existingEffect.getAmplifier() > elitePotionEffect.getPotionEffect().getAmplifier())
-                return;
-            // Don't override if existing effect has more than 2 seconds (40 ticks) remaining
-            // This prevents overwriting long-duration potion effects with short-duration charm effects
-            if (existingEffect.getDuration() > 40)
-                return;
-        }
+        // Check if player already has this effect active.
+        // TF fork 2026-08-18: 判定は ContinuousPotionPolicy が正本。上流は残り時間を
+        // getDuration() > 40 だけで見ていたため、無期限効果(Paper では getDuration() == -1)を
+        // 「切れかけ」と誤判定し、1秒ごとにこのループが無期限効果を剥がして数秒の効果へ
+        // 差し替えていた(無期限の幸運が数秒で消える不具合)。
+        PotionEffect existingEffect = player.getPotionEffect(elitePotionEffect.getPotionEffect().getType());
+        if (ContinuousPotionPolicy.keepsExisting(
+                existingEffect != null,
+                existingEffect != null && existingEffect.getDuration() == PotionEffect.INFINITE_DURATION,
+                existingEffect == null ? Integer.MIN_VALUE : existingEffect.getAmplifier(),
+                existingEffect == null ? 0 : existingEffect.getDuration(),
+                elitePotionEffect.getPotionEffect().getAmplifier()))
+            return;
 
         if (elitePotionEffect.getPotionEffect().getType().equals(PotionEffectType.INSTANT_HEALTH)) {
             Heal.doHeal(player, elitePotionEffect);
