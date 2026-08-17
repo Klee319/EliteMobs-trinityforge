@@ -15,6 +15,7 @@ import com.magmaguy.elitemobs.mobconstructor.PersistentObjectHandler;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.CustomBossEntity;
 import com.magmaguy.elitemobs.playerdata.ElitePlayerInventory;
 import com.magmaguy.elitemobs.playerdata.database.PlayerData;
+import com.magmaguy.elitemobs.trinityforge.EliteDropPolicy;
 import com.magmaguy.elitemobs.utils.ConfigurationLocation;
 import com.magmaguy.elitemobs.utils.WeightedProbability;
 import com.magmaguy.magmacore.util.Logger;
@@ -64,6 +65,21 @@ public class TreasureChest implements PersistentObject {
         this.emPackage = EMPackage.getContent(customTreasureChestConfigFields.getFilename());
 
         if (!customTreasureChestConfigFields.isEnabled())
+            return;
+
+        // TrinityForge (2026-08-18): elite-drop-sources.treasure-chest-loot が閉じているとき、
+        // 宝箱は「開けても中身が1個も出ない空の箱」になる (CustomLootTable#treasureChestDrop* が
+        // メッセージだけ出して return するため)。それでも doInteraction は走るので、ミミックの抽選と
+        // 箱の消滅・再設置だけが続き、プレイヤーには「開ける動機のある箱」に見えてしまう。
+        // ゲートが閉じている間はこの箱を存在ごと無効化する — isEnabled: false と同じ扱いにして、
+        // どちらのマップにも登録しない (= 箱を設置しない・クリックしても何も起きない・ミミックも湧かない)。
+        //
+        // 判定を初期化のこの1点に置けるのは、TrinityForgeIntegration.initialize が
+        // EliteMobs#asyncInitialization の中で new CustomTreasureChestsConfig() より先に走るため。
+        // したがって /trinityforge reload でゲートを開け直しても箱は戻らない (サーバ再起動が必要) —
+        // これは isEnabled を書き換えたときと同じ制約。TrinityForge 未導入時はゲートが常に開く
+        // (dropSourceAllowed が fail-open) ので、素の EliteMobs の挙動は一切変わらない。
+        if (!EliteDropPolicy.shouldDropTreasureChestLoot())
             return;
 
         if (customTreasureChestConfigFields.getChestMaterial() == null)

@@ -89,6 +89,17 @@ class TrinityForgeGateWiringTest {
     }
 
     @Test
+    @DisplayName("TreasureChest itself stands down when the treasure-chest-loot gate is closed (2026-08-18)")
+    void treasureChestIsDisabledByTheGate() throws IOException {
+        // ゲートが閉じていると CustomLootTable 側は「何も出なかった」メッセージだけ返すので、
+        // 箱は「開けても中身が1個も出ないのにミミックだけ湧く空の箱」として残っていた。
+        // TreasureChest 自身がゲートを見て初期化を打ち切る(= 箱を設置しない)ようになったことを固定する。
+        // このアサーションが落ちたら、宝箱がまた「開ける動機のある空箱」に戻っている。
+        String bytecode = constantPoolOf("com/magmaguy/elitemobs/treasurechest/TreasureChest");
+        assertReferences(bytecode, "TreasureChest", "EliteDropPolicy", "shouldDropTreasureChestLoot");
+    }
+
+    @Test
     @DisplayName("all four currency-shower paths consult the same gate")
     void everyCurrencyShowerPathIsWired() throws IOException {
         // 2026-08-01 round2: only LootTables was gated, so the bonus_coins power, the Lua scripting API

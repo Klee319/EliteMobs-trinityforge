@@ -91,6 +91,34 @@ class SharedLootTableTrinityForgeTest {
         }
     }
 
+    @Test
+    @DisplayName("offerPerPlayerLoot の署名も TrinityForge 側のリフレクションと一致している (2026-08-18)")
+    void offerPerPlayerLootSignatureMatchesTheTrinityForgeBridge() throws NoSuchMethodException {
+        // TrinityForge の EliteMobsSharedLootBridge は getMethod("offerPerPlayerLoot", ...) でここを呼ぶ。
+        // 名前を変えても向こうはコンパイルが通ったまま無言で fail-soft へ戻り、結果として
+        // ダンジョン印が【また1人にしか渡らない】状態に静かに戻るので、署名をここで固定する。
+        Method method = TrinityForgeSharedLoot.class.getMethod("offerPerPlayerLoot", Entity.class, ItemStack.class);
+        assertTrue(Modifier.isPublic(method.getModifiers()), "TrinityForge から呼ぶので public 必須");
+        assertTrue(Modifier.isStatic(method.getModifiers()), "リフレクション呼び出しは static 前提");
+        assertEquals(boolean.class, method.getReturnType(), "「配り終えたか」を boolean で返す契約");
+    }
+
+    @Test
+    @DisplayName("全員配布は need/greed と同じ引き取り条件を通り、人数ぶん clone してから渡す")
+    void perPlayerDeliveryIsWired() throws IOException {
+        String bytecode = constantPoolOf("com/magmaguy/elitemobs/trinityforge/TrinityForgeSharedLoot");
+        for (String reference : new String[]{
+                // 引き取り条件(エリート・2人以上・インスタンス化ダンジョン)を need/greed と共有していること。
+                "eligibleReceivers",
+                // clone を落とすと1人目の addItem で amount が 0 になり、2人目以降が無言で受け取れない。
+                "clone",
+                "addItem"}) {
+            assertTrue(bytecode.contains(reference),
+                    "TrinityForgeSharedLoot が " + reference + " を参照しなくなっている — "
+                            + "全員配布の経路が壊れている可能性がある。");
+        }
+    }
+
     /** {@code TrinityForgeGateWiringTest} と同じ、生バイト列を ISO-8859-1 で読む定数プール検査。 */
     private static String constantPoolOf(String internalName) throws IOException {
         try (InputStream in = SharedLootTableTrinityForgeTest.class.getClassLoader()
