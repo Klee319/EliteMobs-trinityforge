@@ -42,6 +42,11 @@ public class DungeonInstance extends MatchInstance {
 
     private final List<DungeonObjective> dungeonObjectives = new ArrayList<>();
     private boolean instanceRemovalScheduled = false;
+    // 注意(2026-08-18 調査): このフィールドは MatchInstance.world を隠している(フィールドは静的型で解決されるため、
+    // MatchInstance 側から見た world は永久に null のまま)。その結果 MatchInstanceEvents.onPlayerTeleport の
+    // 「インスタンスのワールドを跨ぐテレポートを弾く」ループは常に continue して事実上デッドコードになっている。
+    // super.world へ代入すると待機中(WAITING)の離脱テレポートまで一律キャンセルされ、ロビーから出られなくなるので、
+    // 挙動は上流のまま据え置く。触るときはここを読んでから触ること。
     @Getter
     private World world;
     @Getter

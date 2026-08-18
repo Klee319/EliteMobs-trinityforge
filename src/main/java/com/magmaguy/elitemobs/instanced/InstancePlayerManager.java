@@ -103,6 +103,12 @@ public class InstancePlayerManager {
                 matchInstance.state != MatchInstance.InstancedRegionState.COMPLETED_DEFEAT &&
                 matchInstance.state != MatchInstance.InstancedRegionState.COMPLETED_VICTORY &&
                 matchInstance.players.isEmpty()) {
+            // 2026-08-18: 「最後の 1 人が抜けた/落ちた」でインスタンスが畳まれた経路を残す。
+            // 強制終了の不具合調査では、これが出るか onPlayerDamage 側の診断が出るかで原因が分かれる。
+            com.magmaguy.magmacore.util.Logger.warn(
+                    "[instance-diag] 最後の参加者が離脱したため攻略失敗扱いで終了: player=" + player.getName()
+                            + " online=" + player.isOnline()
+                            + " state=" + matchInstance.getState());
             matchInstance.defeat();
         } else
             //Remove lives
@@ -120,6 +126,29 @@ public class InstancePlayerManager {
         AttributeManager.setAttribute(player, "generic_max_health", AttributeManager.getAttributeBaseValue(player, "generic_max_health"));
         matchInstance.players.remove(player);
         if (matchInstance.players.isEmpty()) {
+            // 2026-08-18: 参加時に残機 3 を配っている(下の addNewPlayer の playerLives.put)のに、
+            // ソロ攻略および全滅時は残機を一度も参照せず即 defeat() していた。
+            // 残機を減らせる唯一の経路 revivePlayer() は「死亡バナーを叩ける生存者」がいて初めて成立するので、
+            // ソロでは残機が構造的に使えず、1 回の致死ダメージでインスタンスが即終了していた。
+            // しかも致死ダメージは onPlayerDamage でキャンセルされるため死亡メッセージも出ない。
+            // ここで残機を消費して入口へ復帰させ、尽きたときだけ攻略失敗にする。
+            Integer remainingLives = matchInstance.playerLives.get(player);
+            if (remainingLives != null && remainingLives > 1 && player.isOnline()) {
+                matchInstance.playerLives.put(player, remainingLives - 1);
+                matchInstance.players.add(player);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setFireTicks(0);
+                player.setHealth(player.getMaxHealth());
+                MatchInstance.MatchInstanceEvents.teleportBypass = true;
+                player.teleport(matchInstance.startLocation);
+                PlayerData.setMatchInstance(player, matchInstance);
+                player.sendMessage("§c倒れた… §7残機 §f" + (remainingLives - 1) + " §7で入口から再開する。");
+                com.magmaguy.magmacore.util.Logger.info(
+                        "[instance-diag] 最後の生存者が倒れたので残機を消費して復帰: player=" + player.getName()
+                                + " remaining=" + (remainingLives - 1)
+                                + " world=" + player.getWorld().getName());
+                return;
+            }
             matchInstance.defeat();
             MatchInstance.MatchInstanceEvents.teleportBypass = true;
             if (matchInstance.previousPlayerLocations.get(player) != null)

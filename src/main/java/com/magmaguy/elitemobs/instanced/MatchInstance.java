@@ -44,6 +44,8 @@ public abstract class MatchInstance {
     @Getter
     protected HashSet<Player> participants = new HashSet<>();
     protected HashSet<Player> spectators = new HashSet<>();
+    // 2026-08-18: 「インスタンス外に出た参加者を引き戻した」診断ログの重複抑制用(毎 tick 走るため)。
+    private final HashSet<Player> outOfRegionLogged = new HashSet<>();
     @Getter
     protected InstancedRegionState state = InstancedRegionState.WAITING;
     protected Location lobbyLocation = null;
@@ -153,8 +155,21 @@ public abstract class MatchInstance {
 
     private void playerWatchdog() {
         ((HashSet<Player>) players.clone()).forEach(player -> {
-            if (!player.isOnline()) removePlayer(player);
+            if (!player.isOnline()) {
+                removePlayer(player);
+                return;
+            }
             if (!isInRegion(player.getLocation())) {
+                // 2026-08-18: この監視は毎 tick 走るので、外部プラグインがプレイヤーをインスタンス外へ
+                // 飛ばすと「引き戻し ↔ 飛ばし」のループになる。ログはプレイヤーごとに 1 回だけ出す。
+                if (outOfRegionLogged.add(player))
+                    com.magmaguy.magmacore.util.Logger.warn(
+                            "[instance-diag] インスタンス外に出たプレイヤーを引き戻した: player=" + player.getName()
+                                    + " world=" + player.getWorld().getName()
+                                    + " expected=" + (startLocation != null && startLocation.getWorld() != null
+                                    ? startLocation.getWorld().getName() : "?")
+                                    + " state=" + state
+                                    + " — 何かがインスタンス外へテレポートさせている。以後この参加者では抑制する。");
                 MatchInstanceEvents.teleportBypass = true;
                 player.teleport(startLocation);
             }
@@ -263,6 +278,15 @@ public abstract class MatchInstance {
         if (state != InstancedRegionState.COMPLETED_VICTORY &&
                 state != InstancedRegionState.COMPLETED_DEFEAT)
             state = InstancedRegionState.COMPLETED;
+        // 2026-08-18: 終了の理由が一切ログに残らず、「数秒で強制終了する」不具合の切り分けができなかった。
+        // 終了は 1 インスタンスにつき 1 回しか起きないのでログ量は問題にならない。
+        com.magmaguy.magmacore.util.Logger.info(
+                "[instance-diag] インスタンス終了: state=" + state
+                        + " world=" + (startLocation != null && startLocation.getWorld() != null
+                        ? startLocation.getWorld().getName() : "?")
+                        + " players=" + players.size()
+                        + " spectators=" + spectators.size()
+                        + " participants=" + participants.size());
         //todo this should probable call resetMatch() and resetMatch() should probably be renamed because that's not what it does
         new MatchDestroyEvent(this);
     }
@@ -350,7 +374,31 @@ public abstract class MatchInstance {
             if (event.getFinalDamage() < player.getHealth()) return;
             MatchInstance matchInstance = PlayerData.getMatchInstance(player);
             if (matchInstance == null) return;
-            if (matchInstance.state != InstancedRegionState.ONGOING) matchInstance.removePlayer(player);
+
+            // 2026-08-18: 攻略開始前(WAITING/STARTING)の致死ダメージがインスタンスごと畳んでいた。
+            // 旧コードはここで removePlayer() を呼ぶので、ソロだと players が空になり
+            // defeat() → endMatch() → removeInstance() まで一気に走る。しかも致死ダメージは
+            // 直後に setCancelled されるため死亡メッセージも死亡画面も出ない。
+            // プレイヤーからは「/em start の数秒後に強制的にオーバーワールドへ戻された」としか見えず、
+            // 原因の手掛かりがログにも一切残らなかった(2026-08-18 報告の不具合)。
+            // ロビー/カウントダウン中はまだ攻略が始まっていないので、ダメージだけ打ち消して待機を続ける。
+            if (matchInstance.state != InstancedRegionState.ONGOING) {
+                event.setCancelled(true);
+                player.setFireTicks(0);
+                player.setHealth(player.getMaxHealth());
+                com.magmaguy.magmacore.util.Logger.warn(
+                        "[instance-diag] 開始前の致死ダメージを無効化: player=" + player.getName()
+                                + " cause=" + event.getCause()
+                                + " damage=" + event.getFinalDamage()
+                                + " state=" + matchInstance.state
+                                + " world=" + player.getWorld().getName()
+                                + " at " + player.getLocation().getBlockX() + "," + player.getLocation().getBlockY()
+                                + "," + player.getLocation().getBlockZ()
+                                + " — インスタンスは維持する(旧実装はここでインスタンスを破棄していた)。"
+                                + " cause がこの環境で繰り返し出るなら、それがダンジョン強制終了の真因。");
+                return;
+            }
+
             event.setCancelled(true);
             matchInstance.playerDeath(player);
         }
@@ -386,6 +434,15 @@ public abstract class MatchInstance {
             }
 
             if (matchInstance.state == InstancedRegionState.WAITING) {
+                // 2026-08-18: 待機中の「バイパスされていないテレポート」は無言で参加者から外す。
+                // teleportBypass は全インスタンス共通の static boolean 1個なので、
+                // 別経路のテレポートに食われるとここへ落ちて、本人には何も表示されないまま
+                // インスタンスから弾き出される。強制終了の原因調査のため経路を残す。
+                com.magmaguy.magmacore.util.Logger.warn(
+                        "[instance-diag] 待機中のテレポートで参加者から除外: player=" + event.getPlayer().getName()
+                                + " cause=" + event.getCause()
+                                + " from=" + (event.getFrom().getWorld() != null ? event.getFrom().getWorld().getName() : "?")
+                                + " to=" + (event.getTo() != null && event.getTo().getWorld() != null ? event.getTo().getWorld().getName() : "?"));
                 matchInstance.removeAnyKind(event.getPlayer());
                 return;
             }
