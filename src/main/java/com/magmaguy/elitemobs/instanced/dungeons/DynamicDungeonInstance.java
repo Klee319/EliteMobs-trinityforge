@@ -37,6 +37,23 @@ public class DynamicDungeonInstance extends DungeonInstance {
         new SetBossLevelsTask(this, selectedLevel).runTaskLater(MetadataHandler.PLUGIN, 20 * 4L);
     }
 
+    /**
+     * このワールドが動いているダイナミックダンジョンのインスタンスなら、それを返す(そうでなければ null)。
+     *
+     * <p>2026-08-18 (W-80) 追加。インスタンス内で新しく湧いた EliteMobs を「選んだ挑戦レベル」へ
+     * 揃えるために {@link DynamicDungeonLevelListener} が使う。ワールド名で引くのは、インスタンスの
+     * ワールドが毎回新しい連番名でクローンされるため({@code em_id_the_mines_1} など)、
+     * ブループリント名では同定できないから。
+     */
+    public static DynamicDungeonInstance getForWorld(World world) {
+        if (world == null) return null;
+        for (DungeonInstance dungeonInstance : getDungeonInstances())
+            if (dungeonInstance instanceof DynamicDungeonInstance dynamicDungeonInstance
+                    && world.getName().equals(dungeonInstance.getInstancedWorldName()))
+                return dynamicDungeonInstance;
+        return null;
+    }
+
     public static void setupDynamicDungeon(Player player, String dungeonConfigFieldsString, String difficultyName, int selectedLevel) {
         ContentPackagesConfigFields dynamicDungeonConfigFields = ContentPackagesConfig.getDungeonPackages().get(dungeonConfigFieldsString);
         if (dynamicDungeonConfigFields == null) {
@@ -114,18 +131,31 @@ public class DynamicDungeonInstance extends DungeonInstance {
             this.level = level;
         }
 
+        /**
+         * 2026-08-18 (W-80): 以前は {@link InstancedBossEntity} だけを引き上げていたが、
+         * ブループリント配置ではない個体(ボスの召喚した増援、フェーズ2/3の本体、API 経由で湧いた個体、
+         * 自然湧きの elite)がこの網から漏れていた。漏れた個体は {@code level: dynamic} の既定経路
+         * ({@code CustomBossEntity#getDynamicLevel})に落ちて<b>近くのプレイヤーの EliteMobs 装備tier</b>で
+         * レベルが決まる ── TF は EliteMobs のアイテム体系を使わないので、その tier は実質 0 で、
+         * つまりレベル1相当の張りぼてになる。ここは3秒後に一度だけ走る保険なので、インスタンス内の
+         * elite を種類で区別せず全部そろえる(常時の面倒は {@link DynamicDungeonLevelListener} が見る)。
+         */
         @Override
         public void run() {
-            getWorld().getEntities().forEach(entity -> {
-                if (entity instanceof org.bukkit.entity.LivingEntity) {
-                    Object eliteEntity = com.magmaguy.elitemobs.entitytracker.EntityTracker.getEliteMobEntity(entity);
-                    if (eliteEntity instanceof InstancedBossEntity) {
-                        InstancedBossEntity boss = (InstancedBossEntity) eliteEntity;
-                        if (boss.getDungeonInstance() == dynamicDungeonInstance) {
-                            boss.setEntityLevel(level);
-                        }
-                    }
+            World instanceWorld = getWorld();
+            if (instanceWorld == null) return;
+            instanceWorld.getEntities().forEach(entity -> {
+                if (!(entity instanceof org.bukkit.entity.LivingEntity)) return;
+                com.magmaguy.elitemobs.mobconstructor.EliteEntity eliteEntity =
+                        com.magmaguy.elitemobs.entitytracker.EntityTracker.getEliteMobEntity(entity);
+                if (eliteEntity == null) return;
+                if (eliteEntity instanceof InstancedBossEntity boss
+                        && boss.getDungeonInstance() != null
+                        && boss.getDungeonInstance() != dynamicDungeonInstance) {
+                    // 別インスタンスのボスが同じワールドに居ることは無いはずだが、居たら触らない。
+                    return;
                 }
+                DynamicDungeonLevelListener.applySelectedLevel(eliteEntity, level);
             });
         }
     }

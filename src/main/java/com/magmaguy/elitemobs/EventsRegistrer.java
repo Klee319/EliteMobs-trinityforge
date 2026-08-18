@@ -175,6 +175,9 @@ public class EventsRegistrer {
         // so a TrinityForge-only plugin-manager reload doesn't leave dungeon-only EXP silently broken
         // until EliteMobs also restarts (see TrinityForgeReloadListener javadoc).
         register(new com.magmaguy.elitemobs.trinityforge.TrinityForgeReloadListener());
+        // 2026-08-18 (W-80): ダイナミックダンジョン内で湧いた elite を必ず「選んだ挑戦レベル」へ揃える。
+        // TrinityForgeSpawnListener(HIGH) が MOB_LEVEL を刻む前に効かせる必要があるので LOWEST。
+        register(new com.magmaguy.elitemobs.instanced.dungeons.DynamicDungeonLevelListener());
 
         /*
         While these powers could be registered in a more automated way, I realized that it's also a bad way of getting
