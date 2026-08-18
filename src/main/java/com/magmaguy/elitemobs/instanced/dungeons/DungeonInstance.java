@@ -195,12 +195,20 @@ public class DungeonInstance extends MatchInstance {
         // (called from the constructor after a non-consuming setup-time preview) and every
         // later party member joining an already-running instance from the dungeon browser menus, neither of
         // which goes through PlayerPreTeleportEvent (fork spec section 6 / design-inconsistency notes a & b).
-        // Placed before super.addNewPlayer() so a denial happens before the participant list / PlayerData / the
-        // scheduled teleport are touched.
-        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener.checkDungeonEntryAllowed(
+        //
+        // 2026-08-18 実サーバ報告「4人ぶんの鍵を作ったのに1人しか入れず、残り3人は鍵だけ消えた」の修正:
+        // ここは以前 checkDungeonEntryAllowed(=鍵を消費する版)を super.addNewPlayer() より **前** に
+        // 呼んでいた。super 側は「開催中(WAITING以外)」「満員(maxPlayerCount 超過)」「権限不足」で false を
+        // 返すため、エンチャント試練のような maxPlayerCount: 1 のダンジョンでは、ブラウザから既存
+        // インスタンスへ参加しようとした2人目以降が **鍵を取られてから満員で追い返される**。
+        // 判定は非消費版(preview)で先に行い、実際に参加が成立してから消費する。preview と consume の間に
+        // 挟まるのは同期処理だけなので、preview が通った直後の consume が鍵不足で落ちることはない。
+        if (!com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener.previewDungeonEntryAllowed(
                 player, contentPackagesConfigFields.getFilename()))
             return false;
         if (!super.addNewPlayer(player)) return false;
+        com.magmaguy.elitemobs.trinityforge.TrinityForgeDungeonGateListener.checkDungeonEntryAllowed(
+                player, contentPackagesConfigFields.getFilename());
         if (levelSync > 0)
             player.sendMessage(DungeonsConfig.getDungeonDifficultyMessage().replace("$difficulty", difficultyName).replace("$levelSync", String.valueOf(levelSync)));
         return true;

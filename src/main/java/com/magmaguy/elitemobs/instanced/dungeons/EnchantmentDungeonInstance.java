@@ -79,8 +79,41 @@ public class EnchantmentDungeonInstance extends DungeonInstance {
         return true;
     }
 
+    /**
+     * このインスタンスが「エンチャントの賭け」を伴っているか(2026-08-18 実サーバ報告の修正)。
+     *
+     * <p>{@code enchantmentChallenge: true} のコンテンツパッケージは2通りの入口を持つ:
+     * <ul>
+     *   <li>{@link #setupRandomEnchantedChallengeDungeon} — エンチャントメニュー経由。ここでだけ
+     *       {@code upgradedItem}(成功時に渡す強化後アイテム)と {@code currentItem}(失敗時に返す元アイテム)
+     *       がセットされる。</li>
+     *   <li>{@link DungeonInstance#setupInstancedDungeon} — 通常のダンジョン入場(TrinityForge の鍵ゲート /
+     *       ダンジョンブラウザ)。{@code initializeInstancedWorld} は
+     *       {@code isEnchantmentChallenge()} を見て <b>この</b> クラスを生成するので、賭けアイテムは
+     *       <b>両方 null のまま</b>になる。</li>
+     * </ul>
+     *
+     * <p>後者で {@link #victory()}/{@link #defeat()} がそのまま走ると
+     * {@code currentItem.getItemMeta()} で NPE になり、<b>例外が呼び出し元まで抜けて脱出処理を丸ごと飛ばす</b>。
+     * 実際に 2026-08-18 17:45 に発生した障害はこれで、
+     * {@code InstancePlayerManager#playerDeath} の defeat() が投げた結果その直後の
+     * 「元の位置へテレポートして戻す」が実行されず、プレイヤーは {@code players} にも
+     * {@code spectators} にも属さない状態でインスタンスワールドに取り残された
+     * ({@code removeAnyKind} が何もしなくなるため {@code /em quit} でも戻れない)。
+     * ワールドも「中に人が居る」ため削除に失敗して残り続ける。
+     */
+    private boolean hasEnchantmentStake() {
+        return player != null && upgradedItem != null && currentItem != null;
+    }
+
     @Override
     public void endMatch() {
+        if (!hasEnchantmentStake()) {
+            // 賭けアイテムが無い＝通常のダンジョンとして入場された個体。上位(DungeonInstance)の
+            // 終了処理に従い、参加者への通知と規定時間後の解体を通常どおり行う。
+            super.endMatch();
+            return;
+        }
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -92,6 +125,7 @@ public class EnchantmentDungeonInstance extends DungeonInstance {
     @Override
     protected void victory() {
         super.victory();
+        if (!hasEnchantmentStake()) return;
         player.sendMessage(DungeonsConfig.getEnchantChallengeCompleteMessage());
         player.sendMessage(DungeonsConfig.getEnchantChallengeSuccessMessage());
         ItemEnchantmentMenu.broadcastEnchantmentMessage(upgradedItem, player, SpecialItemSystemsConfig.getSuccessAnnouncement());
@@ -103,6 +137,7 @@ public class EnchantmentDungeonInstance extends DungeonInstance {
     @Override
     protected void defeat() {
         super.defeat();
+        if (!hasEnchantmentStake()) return;
         if (ThreadLocalRandom.current().nextDouble() < SpecialItemSystemsConfig.getCriticalFailureChanceDuringChallengeChance()) {
             player.sendMessage(DungeonsConfig.getEnchantCriticalFailureMessage().replace("$item", currentItem.getItemMeta().getDisplayName()));
             ItemEnchantmentMenu.broadcastEnchantmentMessage(upgradedItem, player, SpecialItemSystemsConfig.getCriticalFailureAnnouncement());

@@ -149,7 +149,19 @@ public class InstancePlayerManager {
                                 + " world=" + player.getWorld().getName());
                 return;
             }
-            matchInstance.defeat();
+            // 2026-08-18: defeat() の中で例外が出ると、この直後の「元の位置へ戻す」が丸ごと飛ばされ、
+            // players にも spectators にも属さないプレイヤーがインスタンスワールドに取り残される
+            // (removeAnyKind が何もしなくなるので /em quit でも戻れず、ワールドも削除できず残る)。
+            // 実際に EnchantmentDungeonInstance#defeat の NPE でこれが起きたので、脱出だけは必ず通す。
+            try {
+                matchInstance.defeat();
+            } catch (RuntimeException | LinkageError e) {
+                com.magmaguy.magmacore.util.Logger.warn(
+                        "[instance-diag] 攻略失敗処理で例外が出たがプレイヤーの脱出は続行する: player="
+                                + player.getName() + " instance=" + matchInstance.getClass().getSimpleName()
+                                + " error=" + e);
+                e.printStackTrace();
+            }
             MatchInstance.MatchInstanceEvents.teleportBypass = true;
             if (matchInstance.previousPlayerLocations.get(player) != null)
                 player.teleport(matchInstance.previousPlayerLocations.get(player));
