@@ -130,6 +130,10 @@ public class InstancedBossEntity extends RegionalBossEntity implements Persisten
     public void setEntityLevel(int level) {
         this.level = level;
         setMaxHealth();
+        // 2026-08-18: TF の MOB_LEVEL 刻印はスポーン時に1回書かれるだけなので、ここでレベルを
+        // 変えても刻み直さないと TF はスポーン時の値を見続ける。TF はレベル差で経験値と
+        // ドロップ確率を増減させるため、刻み直さないとダンジョンで選んだレベルが報酬に反映されない。
+        com.magmaguy.elitemobs.trinityforge.TrinityForgeIntegration.restampMobLevel(livingEntity, level);
     }
 
     @Override

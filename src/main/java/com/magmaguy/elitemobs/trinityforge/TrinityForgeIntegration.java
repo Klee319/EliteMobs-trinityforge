@@ -350,6 +350,26 @@ public final class TrinityForgeIntegration {
     }
 
     /**
+     * TF が読む {@link PdcKeys#MOB_LEVEL} を、スポーン後にレベルが変わった個体へ刻み直す(2026-08-18)。
+     *
+     * <p>刻印はスポーン時に {@code TrinityForgeSpawnListener#stamp} が1回だけ書くので、あとから
+     * {@code InstancedBossEntity#setEntityLevel} でレベルを変えても TF 側はスポーン時の値を見続ける。
+     * TF はレベル差で経験値とドロップ確率を増減させる(格上ボーナス / レベル差による足きり)ため、
+     * ここがずれると<b>ダンジョンで選んだレベルが報酬に反映されない</b>。
+     *
+     * <p>レベル以外(守備・攻撃・HP)の刻印は書き換えない ── それらは EM 側が自分の計算で
+     * 実体へ適用済みで、ここで部分的に上書きすると刻印と実体が食い違うため。
+     */
+    public static void restampMobLevel(Entity entity, int level) {
+        if (!available || entity == null) return;
+        try {
+            entity.getPersistentDataContainer().set(PdcKeys.MOB_LEVEL, PersistentDataType.INTEGER, level);
+        } catch (RuntimeException | LinkageError e) {
+            Logger.warn("Failed to restamp TrinityForge mob level for " + entity.getType() + ": " + e.getMessage());
+        }
+    }
+
+    /**
      * Resolves (and lazily persists) a stable per-mob roll seed used to scale HP and attack power
      * together (fork spec item 2 — individual variance). Reads {@link PdcKeys#MOB_ROLL_SEED} from the
      * entity's PDC; if absent, rolls one and writes it back so the HP-resolution path
