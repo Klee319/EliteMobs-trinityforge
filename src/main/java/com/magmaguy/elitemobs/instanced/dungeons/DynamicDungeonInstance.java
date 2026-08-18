@@ -34,7 +34,22 @@ public class DynamicDungeonInstance extends DungeonInstance {
         // Recalculate level sync for dynamic dungeons based on the player-selected level
         recalculateLevelSyncForDynamicLevel(selectedLevel);
 
-        new SetBossLevelsTask(this, selectedLevel).runTaskLater(MetadataHandler.PLUGIN, 20 * 4L);
+        new SetBossLevelsTask(this).runTaskLater(MetadataHandler.PLUGIN, 20 * 4L);
+    }
+
+    /**
+     * このインスタンスのモブに与える実効レベル(TrinityForge 追加、2026-08-18 W-80)。
+     * = 選んだ挑戦レベル + 難易度補正({@link DungeonInstance#getDifficultyMobLevelOffset()})。
+     *
+     * <p>normal はモブが5レベル低く、mythic は5レベル高くなる。素の EM では難易度は
+     * 持ち込めるEMアイテムの tier 上限にしか効かず、TF は EliteMobs のアイテム体系を使わないので
+     * <b>難易度を変えても何一つ変わらなかった</b>。TF 側の報酬増減は倒したモブのレベルを5レベル刻みで
+     * 見るので、ここで難易度をモブレベルへ反映すると「難易度1段 = 報酬1段」が成立する。
+     *
+     * <p>レベル1未満にはしない。
+     */
+    public int getMobLevel() {
+        return Math.max(1, selectedLevel + getDifficultyMobLevelOffset());
     }
 
     /**
@@ -116,6 +131,15 @@ public class DynamicDungeonInstance extends DungeonInstance {
         // Show additional info about the selected level for dynamic dungeons
         player.sendMessage(DungeonsConfig.getDynamicDungeonLevelSetMessage().replace("$level", String.valueOf(selectedLevel)));
 
+        // TrinityForge 追加(2026-08-18 W-80): 難易度でモブレベルが動くので、実際の敵レベルを明示する。
+        // 表示しないと「同じレベルを選んだのに難易度で強さも報酬も違う」理由がプレイヤーから見えない。
+        int mobLevel = getMobLevel();
+        if (mobLevel != selectedLevel) {
+            player.sendMessage("§7難易度により敵のレベルは §e" + mobLevel + " §7になります"
+                    + " (§e" + (mobLevel > selectedLevel ? "+" : "") + (mobLevel - selectedLevel) + "§7)。"
+                    + "敵が強いほど追加ドロップと経験値が増えます。");
+        }
+
         // Adapt player's active DynamicQuests to the dungeon's selected level
         DynamicQuest.adaptPlayerQuestsToLevel(player, selectedLevel);
 
@@ -124,11 +148,9 @@ public class DynamicDungeonInstance extends DungeonInstance {
 
     private class SetBossLevelsTask extends BukkitRunnable {
         private final DynamicDungeonInstance dynamicDungeonInstance;
-        private final int level;
 
-        public SetBossLevelsTask(DynamicDungeonInstance dynamicDungeonInstance, int level) {
+        public SetBossLevelsTask(DynamicDungeonInstance dynamicDungeonInstance) {
             this.dynamicDungeonInstance = dynamicDungeonInstance;
-            this.level = level;
         }
 
         /**
@@ -144,6 +166,7 @@ public class DynamicDungeonInstance extends DungeonInstance {
         public void run() {
             World instanceWorld = getWorld();
             if (instanceWorld == null) return;
+            int level = dynamicDungeonInstance.getMobLevel();
             instanceWorld.getEntities().forEach(entity -> {
                 if (!(entity instanceof org.bukkit.entity.LivingEntity)) return;
                 com.magmaguy.elitemobs.mobconstructor.EliteEntity eliteEntity =

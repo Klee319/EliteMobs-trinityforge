@@ -66,8 +66,9 @@ public class DynamicDungeonLevelListener implements Listener {
         }
         if (instance == null) return;
 
-        int selectedLevel = instance.getSelectedLevel();
-        if (selectedLevel <= 0 || eliteEntity.getLevel() == selectedLevel) return;
-        applySelectedLevel(eliteEntity, selectedLevel);
+        // 選んだレベルそのものではなく難易度補正込みの実効レベル(normal -5 / hard ±0 / mythic +5)。
+        int mobLevel = instance.getMobLevel();
+        if (mobLevel <= 0 || eliteEntity.getLevel() == mobLevel) return;
+        applySelectedLevel(eliteEntity, mobLevel);
     }
 }

@@ -368,6 +368,32 @@ public class DungeonInstance extends MatchInstance {
     }
 
     /**
+     * 難易度に応じたモブレベルの補正値(TrinityForge 追加、2026-08-18 W-80)。
+     *
+     * <p>EM の難易度は相対 levelSync({@code normal: +5 / hard: +0 / mythic: -5})でしか差が付いておらず、
+     * これは<b>持ち込めるEMアイテムの tier 上限</b>にしか効かない。TrinityForge は EliteMobs の
+     * アイテム体系を使わないので、素の EM では難易度を変えても<b>何一つ変わらなかった</b>。
+     *
+     * <p>そこで levelSync の符号を反転した値をモブレベルの補正として使う ──
+     * normal はモブが5レベル低く(易しい)、mythic は5レベル高く(難しい)なる。
+     * TF 側の {@code dungeon-level-reward} は倒したモブのレベルを5レベル刻みで見て報酬を増減するので、
+     * これで「難易度1段 = 報酬1段」が成立し、normal/hard/mythic のどれを選ぶかに意味が生まれる。
+     *
+     * <p>絶対値指定({@code levelSync: 70} など)のダンジョンは対象外で常に 0 を返す ──
+     * 絶対値はダイナミックではない固定レベルのダンジョンで使われており、難易度差を表していないため。
+     *
+     * @return モブレベルへ足す補正値(相対 levelSync でなければ 0)
+     */
+    public int getDifficultyMobLevelOffset() {
+        if (!isRelativeLevelSync()) return 0;
+        try {
+            return -Integer.parseInt(rawLevelSync.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /**
      * Checks if the level sync is using a relative value (starts with + or -)
      * @return true if relative, false if absolute or not set
      */

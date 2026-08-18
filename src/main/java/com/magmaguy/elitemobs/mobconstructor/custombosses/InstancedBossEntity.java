@@ -40,7 +40,10 @@ public class InstancedBossEntity extends RegionalBossEntity implements Persisten
         if (level == -1) {
             // For dynamic dungeons, use the player-selected level instead of calculating from gear
             if (dungeonInstance instanceof DynamicDungeonInstance dynamicDungeonInstance) {
-                level = dynamicDungeonInstance.getSelectedLevel();
+                // TrinityForge 変更(2026-08-18 W-80): 選んだレベルそのものではなく難易度補正込みの実効レベル。
+                // normal は -5 / mythic は +5。素の EM では難易度は持ち込めるEMアイテムの tier 上限にしか
+                // 効かず、TF は EliteMobs のアイテム体系を使わないので難易度が完全な no-op だった。
+                level = dynamicDungeonInstance.getMobLevel();
             } else if (dungeonInstance.getPlayers().isEmpty()) {
                 Logger.warn("Failed to get players for new instance when assigning dynamic level! The bosses will default to level 1.");
             } else {
