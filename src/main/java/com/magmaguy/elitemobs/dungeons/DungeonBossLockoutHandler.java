@@ -82,8 +82,18 @@ public class DungeonBossLockoutHandler implements Listener {
 
     /**
      * Notifies a player that they are locked out from boss loot.
+     *
+     * <p>TrinityForge 変更(2026-08-21): {@code dungeonLockoutNotificationEnabled} が false のときは
+     * <b>チャット・タイトル・アクションバーのいずれも出さない</b>（ユーザー要望「EM ダンジョンの討伐時に
+     * ロックアウトのチャットとタイトル通知が出ないようにしてほしい」）。この3つは同じ1件の通知を
+     * 3経路で出しているだけなので、片方だけ残すと「音は消えたのに画面には出る」状態になる。
+     *
+     * <p><b>戦利品の抑止はここではない</b>。ロックアウト自体は {@code processLockouts} が返す
+     * {@code lockedOutPlayers} を {@code CustomBossDeath} が見て行うので、通知を止めても
+     * 「ロックアウト中は報酬が出ない」挙動は一切変わらない。
      */
     private static void notifyLockout(Player player, InstancedBossEntity boss, DungeonBossLockout lockout, String bossIdentifier) {
+        if (!DungeonsConfig.isDungeonLockoutNotificationEnabled()) return;
         // Show subtitle
         String subtitle = DungeonsConfig.getDungeonLockoutSubtitle();
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(subtitle));

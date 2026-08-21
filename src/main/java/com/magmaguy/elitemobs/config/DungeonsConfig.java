@@ -47,6 +47,25 @@ public class DungeonsConfig extends ConfigurationFile {
     private static String dynamicDungeonDifficultySelectionMenuTitle;
     @Getter
     private static String dynamicDungeonDifficultySelectionSelectedLevel;
+    // TrinityForge 追加(2026-08-21): ダイナミックダンジョンの難易度は「戦闘レベルの何%で潜るか」を選ぶ。
+    // 素の EM は難易度を相対 levelSync(±5) でしか区別せず、それは持ち込める EM アイテムの tier 上限に
+    // しか効かないので、TF では「難易度 = モブレベルの割合」に置き換えてある。
+    @Getter
+    private static int dynamicDungeonCombatLevelPercentEasy;
+    @Getter
+    private static int dynamicDungeonCombatLevelPercentNormal;
+    @Getter
+    private static int dynamicDungeonCombatLevelPercentHard;
+    @Getter
+    private static String dynamicDungeonDifficultyDisplayNameEasy;
+    @Getter
+    private static String dynamicDungeonDifficultyDisplayNameNormal;
+    @Getter
+    private static String dynamicDungeonDifficultyDisplayNameHard;
+    @Getter
+    private static String dynamicDungeonDifficultySelectionMobLevel;
+    @Getter
+    private static boolean dungeonLockoutNotificationEnabled;
     @Getter
     private static String dungeonLockoutTitle;
     @Getter
@@ -398,6 +417,48 @@ public class DungeonsConfig extends ConfigurationFile {
                 List.of("Sets the 'selected level' text in the dynamic dungeon difficulty selection menu",
                         "$level is the placeholder for the selected level number"),
                 file, fileConfiguration, "dynamicDungeonDifficultySelectionSelectedLevel", "&7Selected Level: &e$level", true);
+        // TrinityForge 変更(2026-08-21): 既定を false にしてある。ロックアウト済みのボスを倒したとき、
+        // 素の EM は「チャット + タイトル + アクションバー」の3つを同時に出す。討伐の演出と重なって
+        // うるさいというユーザー要望により、既定で全部黙らせる。true にすると素の EM の挙動へ戻る。
+        // TrinityForge 追加(2026-08-21): 難易度 = 戦闘レベルの何%で潜るか。
+        // 「別の職業を上げるときにダンジョンのレベルが高すぎる」というユーザー要望への対応で、
+        // 素の EM の「戦闘レベル ±5」ではなく割合で下げられるようにした。
+        // ⚠ 内部の難易度キーは EM のコンテンツパッケージ側の名前(normal/hard/mythic)のまま。
+        //   全ダンジョンの yml を書き換えずに意味だけを差し替えるため、ここで対応表を持つ。
+        //   normal -> イージー(50%) / hard -> ノーマル(75%) / mythic -> ハード(100%)。
+        //   メニューの並びはコンテンツパッケージの定義順(normal, hard, mythic)なので、
+        //   結果として「易しい順」に左から並ぶ。
+        dynamicDungeonCombatLevelPercentEasy = ConfigurationEngine.setInt(
+                List.of("Mob level for the easiest dynamic dungeon difficulty, as a percentage of the",
+                        "player's TrinityForge combat level. Internally the 'normal' difficulty entry."),
+                fileConfiguration, "dynamicDungeonCombatLevelPercentEasy", 50);
+        dynamicDungeonCombatLevelPercentNormal = ConfigurationEngine.setInt(
+                List.of("Mob level for the middle dynamic dungeon difficulty, as a percentage of the",
+                        "player's TrinityForge combat level. Internally the 'hard' difficulty entry."),
+                fileConfiguration, "dynamicDungeonCombatLevelPercentNormal", 75);
+        dynamicDungeonCombatLevelPercentHard = ConfigurationEngine.setInt(
+                List.of("Mob level for the hardest dynamic dungeon difficulty, as a percentage of the",
+                        "player's TrinityForge combat level. Internally the 'mythic' difficulty entry."),
+                fileConfiguration, "dynamicDungeonCombatLevelPercentHard", 100);
+        dynamicDungeonDifficultyDisplayNameEasy = ConfigurationEngine.setString(
+                List.of("Display name for the easiest dynamic dungeon difficulty (internally 'normal')"),
+                file, fileConfiguration, "dynamicDungeonDifficultyDisplayNameEasy", "イージー", true);
+        dynamicDungeonDifficultyDisplayNameNormal = ConfigurationEngine.setString(
+                List.of("Display name for the middle dynamic dungeon difficulty (internally 'hard')"),
+                file, fileConfiguration, "dynamicDungeonDifficultyDisplayNameNormal", "ノーマル", true);
+        dynamicDungeonDifficultyDisplayNameHard = ConfigurationEngine.setString(
+                List.of("Display name for the hardest dynamic dungeon difficulty (internally 'mythic')"),
+                file, fileConfiguration, "dynamicDungeonDifficultyDisplayNameHard", "ハード", true);
+        dynamicDungeonDifficultySelectionMobLevel = ConfigurationEngine.setString(
+                List.of("Sets the 'mob level' text in the dynamic dungeon difficulty selection menu",
+                        "$level is the resulting mob level, $percent is the combat-level percentage"),
+                file, fileConfiguration, "dynamicDungeonDifficultySelectionMobLevel",
+                "&7モブレベル: &e$level &7(戦闘レベルの &e$percent%&7)", true);
+        dungeonLockoutNotificationEnabled = ConfigurationEngine.setBoolean(
+                List.of("Sets whether players get notified (chat + title + action bar) when they kill a boss",
+                        "they are already locked out from. Loot is withheld either way; this only controls the",
+                        "notification. Defaults to false for TrinityForge (the kill sequence is noisy enough)."),
+                fileConfiguration, "dungeonLockoutNotificationEnabled", false);
         dungeonLockoutTitle = ConfigurationEngine.setString(
                 List.of("Title shown on screen during dungeon boss lockout.",
                         "Leave empty for subtitle only."),
@@ -826,5 +887,57 @@ public class DungeonsConfig extends ConfigurationFile {
         eventsReloadingMessage = ConfigurationEngine.setString(
                 List.of("Sets the message shown when EliteMobs is reloading to apply event changes."),
                 file, fileConfiguration, "eventsReloadingMessage", "Reloading EliteMobs to apply event changes!", true);
+    }
+
+    /** 設定が未ロード/0 以下のときに使う既定値。{@link #getDynamicDungeonCombatLevelPercent} の javadoc 参照。 */
+    public static final int DEFAULT_COMBAT_LEVEL_PERCENT_EASY = 50;
+    public static final int DEFAULT_COMBAT_LEVEL_PERCENT_NORMAL = 75;
+    public static final int DEFAULT_COMBAT_LEVEL_PERCENT_HARD = 100;
+
+    /**
+     * 難易度名(EM のコンテンツパッケージ側のキー: {@code normal} / {@code hard} / {@code mythic})から、
+     * 「戦闘レベルの何%でモブレベルを決めるか」を引く(TrinityForge 追加、2026-08-21)。
+     *
+     * <p>知らない名前は 100% として扱う ── 割合が引けないときに 0% を返すと
+     * <b>モブが全部レベル1になって無言で壊れる</b>ので、必ず「素の戦闘レベル」側へ倒す。
+     *
+     * <p>同じ理由で、<b>設定値が 0 以下のときも既定値へ倒す</b>。静的フィールドは
+     * {@code initializeConfiguration} が走るまで 0 なので、設定のロードより先にこのメソッドが
+     * 呼ばれると<b>全難易度が 0% = 常にレベル1</b>になる。これは例外もログも出ない壊れ方で、
+     * 「なぜかダンジョンのモブが全部レベル1」という形でしか表に出ない。
+     */
+    public static int getDynamicDungeonCombatLevelPercent(String difficultyName) {
+        if (difficultyName == null) return DEFAULT_COMBAT_LEVEL_PERCENT_HARD;
+        return switch (difficultyName.toLowerCase(java.util.Locale.ROOT)) {
+            case "normal" -> orDefault(dynamicDungeonCombatLevelPercentEasy, DEFAULT_COMBAT_LEVEL_PERCENT_EASY);
+            case "hard" -> orDefault(dynamicDungeonCombatLevelPercentNormal, DEFAULT_COMBAT_LEVEL_PERCENT_NORMAL);
+            case "mythic" -> orDefault(dynamicDungeonCombatLevelPercentHard, DEFAULT_COMBAT_LEVEL_PERCENT_HARD);
+            default -> DEFAULT_COMBAT_LEVEL_PERCENT_HARD;
+        };
+    }
+
+    private static int orDefault(int configured, int fallback) {
+        return configured > 0 ? configured : fallback;
+    }
+
+    /**
+     * 難易度名の表示用ラベル(TrinityForge 追加、2026-08-21)。知らない名前はそのまま返す。
+     */
+    public static String getDynamicDungeonDifficultyDisplayName(String difficultyName) {
+        if (difficultyName == null) return "";
+        return switch (difficultyName.toLowerCase(java.util.Locale.ROOT)) {
+            case "normal" -> dynamicDungeonDifficultyDisplayNameEasy;
+            case "hard" -> dynamicDungeonDifficultyDisplayNameNormal;
+            case "mythic" -> dynamicDungeonDifficultyDisplayNameHard;
+            default -> difficultyName;
+        };
+    }
+
+    /**
+     * 戦闘レベルと難易度から実際のモブレベルを出す(TrinityForge 追加、2026-08-21)。最低1。
+     */
+    public static int resolveDynamicDungeonMobLevel(int combatLevel, String difficultyName) {
+        int percent = getDynamicDungeonCombatLevelPercent(difficultyName);
+        return Math.max(1, (int) Math.round(Math.max(1, combatLevel) * percent / 100.0));
     }
 }

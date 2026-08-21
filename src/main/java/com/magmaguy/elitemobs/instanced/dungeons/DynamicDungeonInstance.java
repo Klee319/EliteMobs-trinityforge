@@ -39,17 +39,21 @@ public class DynamicDungeonInstance extends DungeonInstance {
 
     /**
      * このインスタンスのモブに与える実効レベル(TrinityForge 追加、2026-08-18 W-80)。
-     * = 選んだ挑戦レベル + 難易度補正({@link DungeonInstance#getDifficultyMobLevelOffset()})。
      *
-     * <p>normal はモブが5レベル低く、mythic は5レベル高くなる。素の EM では難易度は
-     * 持ち込めるEMアイテムの tier 上限にしか効かず、TF は EliteMobs のアイテム体系を使わないので
-     * <b>難易度を変えても何一つ変わらなかった</b>。TF 側の報酬増減は倒したモブのレベルを5レベル刻みで
-     * 見るので、ここで難易度をモブレベルへ反映すると「難易度1段 = 報酬1段」が成立する。
+     * <p><b>2026-08-21 変更</b>: 難易度は「戦闘レベルの何%で潜るか」になった
+     * (イージー50% / ノーマル75% / ハード100%)。その割合は<b>メニューで難易度を選んだ時点で
+     * {@code selectedLevel} に確定済み</b>({@code DynamicDungeonBrowser} が
+     * {@code DungeonsConfig#resolveDynamicDungeonMobLevel} で解決する)なので、
+     * ここでは<b>もう難易度補正を足さない</b>。
+     *
+     * <p>⚠ 以前は {@code selectedLevel + getDifficultyMobLevelOffset()}(相対 levelSync ±5 の符号反転)
+     * だった。割合方式に変えた後もこれを残すと<b>割合で下げたレベルへ更に ±5 が乗る</b>ため、
+     * 「イージーなのに5レベル高い」といった二重適用になる。
      *
      * <p>レベル1未満にはしない。
      */
     public int getMobLevel() {
-        return Math.max(1, selectedLevel + getDifficultyMobLevelOffset());
+        return Math.max(1, selectedLevel);
     }
 
     /**
@@ -130,15 +134,6 @@ public class DynamicDungeonInstance extends DungeonInstance {
         if (!super.addNewPlayer(player)) return false;
         // Show additional info about the selected level for dynamic dungeons
         player.sendMessage(DungeonsConfig.getDynamicDungeonLevelSetMessage().replace("$level", String.valueOf(selectedLevel)));
-
-        // TrinityForge 追加(2026-08-18 W-80): 難易度でモブレベルが動くので、実際の敵レベルを明示する。
-        // 表示しないと「同じレベルを選んだのに難易度で強さも報酬も違う」理由がプレイヤーから見えない。
-        int mobLevel = getMobLevel();
-        if (mobLevel != selectedLevel) {
-            player.sendMessage("§7難易度により敵のレベルは §e" + mobLevel + " §7になります"
-                    + " (§e" + (mobLevel > selectedLevel ? "+" : "") + (mobLevel - selectedLevel) + "§7)。"
-                    + "敵が強いほど追加ドロップと経験値が増えます。");
-        }
 
         // Adapt player's active DynamicQuests to the dungeon's selected level
         DynamicQuest.adaptPlayerQuestsToLevel(player, selectedLevel);
