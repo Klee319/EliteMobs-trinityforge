@@ -14,6 +14,8 @@ import com.magmaguy.elitemobs.config.custombosses.CustomBossesConfigFields;
 import com.magmaguy.elitemobs.dungeons.EMPackage;
 import com.magmaguy.elitemobs.entitytracker.EntityTracker;
 import com.magmaguy.elitemobs.events.CustomEvent;
+import com.magmaguy.elitemobs.instanced.dungeons.DynamicDungeonInstance;
+import com.magmaguy.elitemobs.instanced.dungeons.DynamicDungeonLevelPolicy;
 import com.magmaguy.elitemobs.mobconstructor.*;
 import com.magmaguy.elitemobs.mobconstructor.custombosses.transitiveblocks.TransitiveBlock;
 import com.magmaguy.elitemobs.mobconstructor.mobdata.aggressivemobs.EliteMobProperties;
@@ -255,7 +257,9 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
 
         //This is a bit dumb but -1 is reserved for dynamic levels, commands can force a dynamic to spawn with a level so check that
         if (customBossesConfigFields.getLevel() == -1 && level == -1) {
-            dynamicLevel = true;
+            //TrinityForge: ダイナミックダンジョンの中では「プレイヤーが選んだ挑戦レベル」が唯一の正なので、
+            //周囲プレイヤーを追う 5 秒ごとの updater には載せない(載せると挑戦レベルが毎回取り消される)。
+            dynamicLevel = DynamicDungeonLevelPolicy.tracksNearbyPlayers(dynamicDungeonLevel(spawnLocation));
             getDynamicLevel(spawnLocation);
         }
 
@@ -450,7 +454,47 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
         new DiscordSRVAnnouncement(ChatColorConverter.convert(customBossesConfigFields.getSpawnMessage()));
     }
 
+    /**
+     * TrinityForge 追加(2026-08-22)。この座標がダイナミックダンジョンのインスタンス内なら、
+     * そのインスタンスの挑戦レベルを返す(インスタンス外なら 0)。
+     *
+     * <p><b>なぜ要るか。</b> フェーズボスは体力が閾値を割るたび {@code PhaseBossEntity#switchPhase} で
+     * 「remove → setCustomBossesConfigFields(フェーズ設定) → spawn」をやり直す。
+     * {@code setCustomBossesConfigFields} の末尾は {@code super.setLevel(config.getLevel())} で、
+     * {@code level: dynamic} の設定では<b>これが -1</b> ── インスタンスが与えた挑戦レベルを消す。
+     * 続く {@code spawn} が {@code level == -1} の分岐に落ちて {@link #getDynamicLevel} を呼び、
+     * <b>近くのプレイヤーの戦闘レベルの最大値</b>でレベルを決め直していた。
+     * さらに同じスポーンで 5 秒ごとの {@code dynamicLevelUpdater} にも載るので、
+     * {@code DynamicDungeonLevelListener}(LOWEST)がスポーン時に直しても毎回取り消されていた。
+     *
+     * <p>実害(2026-08-22 のユーザー報告): 34 レベルで作ったダークカテドラルで、道中の雑魚は
+     * {@code [34]} のままなのに最終ボスだけ {@code 『67』} になる ── 最大HPは 8.1 万から 80.6 万へ
+     * およそ 10 倍。100 レベルの人が 50 レベルで部屋を作れば最終ボスだけ 100 レベル相当
+     * (約 800 万 HP)になり、道中はワンパンできるのにボスだけ倒せない設計に化ける。
+     * フェーズを持たない雑魚は {@code switchPhase} を通らないので、この壊れ方はボスにしか出ない。
+     *
+     * @return インスタンス内なら 1 以上の挑戦レベル、そうでなければ 0
+     */
+    private static int dynamicDungeonLevel(Location location) {
+        if (location == null) return 0;
+        try {
+            DynamicDungeonInstance instance = DynamicDungeonInstance.getForWorld(location.getWorld());
+            return instance == null ? 0 : Math.max(0, instance.getMobLevel());
+        } catch (RuntimeException ex) {
+            //インスタンス一覧の走査で落ちてもスポーンは止めない(レベルが揃わないだけ)。
+            Logger.warn("Failed to resolve the dynamic dungeon instance for a custom boss: " + ex.getMessage());
+            return 0;
+        }
+    }
+
     public void getDynamicLevel(Location bossLocation) {
+        if (bossLocation == null) return;
+        int instancedLevel = dynamicDungeonLevel(bossLocation);
+        if (!DynamicDungeonLevelPolicy.tracksNearbyPlayers(instancedLevel)) {
+            //インスタンス内は挑戦レベルで固定。周囲プレイヤー走査へは落とさない。
+            super.setLevel(DynamicDungeonLevelPolicy.resolve(instancedLevel, 1));
+            return;
+        }
         int bossLevel = 1;
         if (bossLocation.getWorld() != null) {
             List<Player> players = bossLocation.getWorld().getPlayers();
@@ -464,7 +508,7 @@ public class CustomBossEntity extends EliteEntity implements Listener, Persisten
                 }
         }
         startUpdatingDynamicLevel();
-        super.setLevel(bossLevel);
+        super.setLevel(DynamicDungeonLevelPolicy.resolve(0, bossLevel));
     }
 
     /**
