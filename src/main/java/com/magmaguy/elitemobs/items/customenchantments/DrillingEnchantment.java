@@ -4,6 +4,7 @@ import com.magmaguy.elitemobs.MetadataHandler;
 import com.magmaguy.elitemobs.config.enchantments.EnchantmentsConfig;
 import com.magmaguy.elitemobs.items.ItemTagger;
 import com.magmaguy.elitemobs.utils.EventCaller;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -16,7 +17,9 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -43,6 +46,15 @@ public class DrillingEnchantment extends CustomEnchantment {
         private MiningDirection miningDirection = null;
         private Player player;
 
+        /**
+         * この1回のドリリングで実際に壊した座標。
+         *
+         * <p>{@link #resendDrilledBlocks(Player)} でクライアントへ送り直すために貯める。
+         * 他のフィールドと同じく、{@code drillBlocks} が1イベント内で同期に走りきる前提で使い回している
+         * （{@code activePlayers} が再入を止めているので、掘っている最中に別の掘削が挟まることはない）。
+         */
+        private final List<Location> drilledLocations = new ArrayList<>();
+
         @EventHandler(priority = EventPriority.HIGHEST)
         public void onDig(BlockBreakEvent event) {
             if (event.isCancelled()) return;
@@ -68,6 +80,7 @@ public class DrillingEnchantment extends CustomEnchantment {
             this.material = originalBlock.getType();
             this.itemStack = playerItem;
             this.miningDirection = determineDirection(originalBlock.getLocation(), playerLocation);
+            this.drilledLocations.clear();
 
             activePlayers.add(player.getUniqueId());
 
@@ -96,6 +109,41 @@ public class DrillingEnchantment extends CustomEnchantment {
 
             activePlayers.remove(player.getUniqueId());
 
+            resendDrilledBlocks(player);
+
+        }
+
+        /**
+         * サーバが消したブロックを、掘ったプレイヤーへもう一度送り直す（2026-08-25）。
+         *
+         * <p><b>直している症状</b>: ドリリングで掘ったあと、消えたはずのブロックが画面に残り、
+         * 叩いても何も起きない（{@code BlockBreakEvent} すら飛ばない）。F3+A のチャンク再描画で
+         * 消えるので、サーバ側は air なのに<b>クライアントだけがブロックを持ったまま</b>＝ゴーストブロック。
+         *
+         * <p><b>なぜ起きるか</b>: {@code breakNaturally} 自体はブロック更新を送るが、
+         * 掘っている本人のクライアントは「今まさに壊しているブロック」を自前で先読み描画しており、
+         * 1回の {@code BlockBreakEvent} で周囲を最大 27 マスまとめて消す Lv4/5 では、
+         * その先読みと後から届く更新が食い違って取りこぼしが出る。
+         *
+         * <p><b>なぜ 2 tick 後か</b>: 同じ tick に送り返すと、クライアントの破壊予測が
+         * 後からその上に乗ってしまい、また同じ絵に戻る。予測が落ち着いてから送る。
+         *
+         * <p><b>なぜ掘った本人にだけ送るか</b>: 食い違うのは破壊予測を持っている本人だけで、
+         * 周りのプレイヤーは通常のブロック更新をそのまま受け取っている。全員へ送ると
+         * Lv5 の連打で無駄なパケットが跳ね上がる。
+         */
+        private void resendDrilledBlocks(Player miner) {
+            if (drilledLocations.isEmpty()) return;
+            List<Location> snapshot = new ArrayList<>(drilledLocations);
+            drilledLocations.clear();
+            Bukkit.getScheduler().runTaskLater(MetadataHandler.PLUGIN, () -> {
+                if (!miner.isOnline()) return;
+                for (Location location : snapshot) {
+                    // 送り直すのは「今のサーバ側の状態」。air とは限らない
+                    // (掘った直後に水が流れ込む・砂が落ちてくる、といったことが起きる)。
+                    miner.sendBlockChange(location, location.getBlock().getBlockData());
+                }
+            }, 2L);
         }
 
         private MiningDirection determineDirection(Location blockLocation, Location playerLocation) {
@@ -140,6 +188,9 @@ public class DrillingEnchantment extends CustomEnchantment {
             if (blockBreakEvent.isCancelled()) return null;
 
             finalBlock.breakNaturally(this.itemStack);
+            // 消した座標を控える。あとで掘った本人へ送り直さないとゴーストブロックが残る
+            // (理由は resendDrilledBlocks の javadoc)。
+            drilledLocations.add(finalBlock.getLocation());
             return finalBlock;
         }
 
